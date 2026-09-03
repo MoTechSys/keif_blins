@@ -301,7 +301,7 @@ pw.Widget dataCard(PdfAssets a, {required String title, required List<(String, S
             child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
               goldDiamond(1.6 * mm),
               pw.SizedBox(width: 1.2 * mm),
-              pw.SizedBox(width: 20 * mm, child: pw.Text(r.$1, style: a.t(7.6, color: K.muted))),
+              pw.SizedBox(width: 26 * mm, child: pw.Text(r.$1, style: a.t(7.6, color: K.muted), maxLines: 1, softWrap: false)),
               pw.Expanded(child: pw.Text(r.$2, style: a.t(8.2, color: K.ink, bold: true))),
             ]),
           ),
