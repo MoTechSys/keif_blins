@@ -1,0 +1,40 @@
+name: keif_diafa
+description: كيف الضيافة — نظام الفواتير وكشوف الحساب
+publish_to: 'none'
+version: 2.0.0+2
+
+environment:
+  sdk: ^3.9.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+  provider: 6.1.5+1
+  hive: 2.2.3
+  hive_flutter: 1.1.0
+  pdf: ^3.11.3
+  printing: ^5.14.2
+  share_plus: ^10.1.4
+  path_provider: 2.1.5
+  intl: 0.20.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/img/
+    - assets/fonts/
+  fonts:
+    - family: Tajawal
+      fonts:
+        - asset: assets/fonts/Tajawal-Regular.ttf
+        - asset: assets/fonts/Tajawal-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/Tajawal-Black.ttf
+          weight: 900
