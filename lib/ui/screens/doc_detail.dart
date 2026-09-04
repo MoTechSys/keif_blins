@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/file_service.dart';
 import '../../core/models.dart';
 import '../../core/money.dart';
 import '../../core/share_service.dart';
@@ -125,7 +126,15 @@ class DocDetail extends StatelessWidget {
               onPressed: () => runBusy(context, 'جارٍ تجهيز الملف…', () async {
                 final pdf = await DocPdf.create(store.org);
                 final bytes = await pdf.invoice(d, store.payments, client: client);
-                await ShareService.sharePdf(bytes, '${ShareService.safeName(d.number)}.pdf', ShareService.invoiceMessage(d, store.org, store.payments));
+                final name = '${ShareService.safeName(d.number)}.pdf';
+                final msg = ShareService.invoiceMessage(d, store.org, store.payments);
+                // حفظ نسخة في مجلد الهاتف ثم مشاركة الملف المحفوظ مباشرة
+                final saved = await FileService.savePdf(bytes, d.isQuote ? FileKind.quote : FileKind.invoice, name, year: FileService.yearOf(d.issueDate));
+                if (saved != null) {
+                  await FileService.share(saved, text: msg, subject: d.number);
+                } else {
+                  await ShareService.sharePdf(bytes, name, msg);
+                }
               }),
               icon: const Icon(Icons.share_rounded, size: 18),
               label: const Text('مشاركة سريعة'),
@@ -246,6 +255,8 @@ class DocDetail extends StatelessWidget {
           fileName: '${ShareService.safeName(d.number)}.pdf',
           message: ShareService.invoiceMessage(d, store.org, store.payments),
           build: () async => (await DocPdf.create(store.org)).invoice(d, store.payments, client: store.client(d.clientId)),
+          kind: d.isQuote ? FileKind.quote : FileKind.invoice,
+          year: FileService.yearOf(d.issueDate),
         ),
       ),
     );

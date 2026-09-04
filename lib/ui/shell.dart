@@ -4,10 +4,12 @@ library;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/lock_service.dart';
 import '../core/store.dart';
 import 'screens/clients_screen.dart';
 import 'screens/docs_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/lock_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/statements_screen.dart';
 import 'theme.dart';
@@ -18,16 +20,47 @@ class Shell extends StatefulWidget {
   State<Shell> createState() => _ShellState();
 }
 
-class _ShellState extends State<Shell> {
+class _ShellState extends State<Shell> with WidgetsBindingObserver {
   int _tab = 0;
 
   void go(int i) => setState(() => _tab = i);
 
   @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// إعادة القفل عند الرجوع من الخلفية بعد المهلة
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    final lock = context.read<LockService>();
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+        lock.onPaused();
+      case AppLifecycleState.resumed:
+        lock.onResumed();
+      case AppLifecycleState.inactive: // نوافذ النظام (المشاركة/الصلاحيات) لا تُقفل التطبيق
+      case AppLifecycleState.detached:
+        break;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final ready = context.select<Store, bool>((s) => s.ready);
     final initError = context.select<Store, String?>((s) => s.initError);
-    if (!ready) {
+    final lockReady = context.select<LockService, bool>((l) => l.initialized);
+    final locked = context.select<LockService, bool>((l) => l.locked);
+    if (ready && lockReady && locked) return const LockScreen();
+    if (!ready || !lockReady) {
       return Scaffold(
         body: SafeArea(
           child: Center(

@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/file_service.dart';
 import '../../core/models.dart';
 import '../../core/money.dart';
 import '../../core/share_service.dart';
@@ -157,6 +158,8 @@ class _PaymentFormState extends State<PaymentForm> {
             fileName: '${ShareService.safeName(p.receiptNumber)}.pdf',
             message: ShareService.receiptMessage(p, c, store.org),
             build: () async => (await DocPdf.create(store.org)).receipt(p, c, inv),
+            kind: FileKind.receipt,
+            year: FileService.yearOf(p.date),
           ),
         ),
       );

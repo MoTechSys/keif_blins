@@ -9,10 +9,14 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../../core/file_service.dart';
+import '../../core/lock_service.dart';
 import '../../core/models.dart';
 import '../../core/store.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'files_screen.dart';
+import 'lock_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -20,6 +24,7 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final store = context.watch<Store>();
+    final lock = context.watch<LockService>();
     final o = store.org;
     return Scaffold(
       appBar: AppBar(title: const Text('الإعدادات')),
@@ -61,20 +66,93 @@ class SettingsScreen extends StatelessWidget {
             ),
           ]),
         ),
+        const SectionTitle('الحماية'),
+        GoldCard(
+          padding: EdgeInsets.zero,
+          child: Column(children: [
+            SwitchListTile(
+              secondary: Icon(lock.enabled ? Icons.lock_rounded : Icons.lock_open_rounded, color: lock.enabled ? C.gold : C.muted),
+              title: const Text('قفل التطبيق برمز سري', style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text(
+                lock.enabled
+                    ? 'مفعّل — يُطلب الرمز عند التشغيل وبعد ${LockService.relockAfterSeconds} ثانية من ترك التطبيق'
+                    : 'رمز من 4 إلى 6 أرقام يحمي بياناتك من الغير',
+                style: const TextStyle(color: C.muted, fontSize: 12),
+              ),
+              value: lock.enabled,
+              onChanged: (v) => v ? _enableLock(context, lock) : _disableLock(context, lock),
+            ),
+            if (lock.enabled) ...[
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.password_rounded),
+                title: const Text('تغيير الرمز', style: TextStyle(fontWeight: FontWeight.w700)),
+                onTap: () => _changePin(context, lock),
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.lock_clock_rounded),
+                title: const Text('قفل الآن', style: TextStyle(fontWeight: FontWeight.w700)),
+                onTap: lock.lockNow,
+              ),
+            ],
+          ]),
+        ),
+        const SectionTitle('مجلد الهاتف'),
+        if (!FileService.supported)
+          const GoldCard(
+            child: Text('حفظ الملفات في مجلد الهاتف متاح في تطبيق أندرويد فقط. على الويب استخدم "مشاركة/تنزيل" من شاشة المعاينة.',
+                style: TextStyle(color: C.muted, fontSize: 12.5, height: 1.5)),
+          )
+        else
+          GoldCard(
+            padding: EdgeInsets.zero,
+            child: Column(children: [
+              const FilesEntryTile(),
+              const Divider(),
+              SwitchListTile(
+                secondary: const Icon(Icons.cloud_sync_rounded),
+                title: const Text('نسخة احتياطية تلقائية', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: const Text('بعد كل تعديل تُحفظ نسخة اليوم في مجلد "النسخ الاحتياطية" (تُحفظ آخر 14 نسخة)',
+                    style: TextStyle(color: C.muted, fontSize: 12)),
+                value: store.autoBackupEnabled,
+                onChanged: store.setAutoBackup,
+              ),
+            ]),
+          ),
         const SectionTitle('النسخة الاحتياطية'),
         Padding(
           padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
           child: Text(
-            'بياناتك محفوظة على هذا الجهاز فقط. احفظ نسخة احتياطية بشكل دوري (مثلًا كل أسبوع) وأرسلها لنفسك على واتساب أو البريد، حتى لا تفقد شيئًا لو ضاع الجهاز أو تغيّر.',
+            'بياناتك محفوظة في قاعدة بيانات محلية على هذا الجهاز فقط. النسخ التلقائية تحميك من الأخطاء، لكن لو ضاع الهاتف تضيع معه — فأرسل نسخة لنفسك على واتساب أو البريد كل فترة.',
             style: TextStyle(color: C.muted, fontSize: 12.5, height: 1.5),
           ),
         ),
         GoldCard(
           padding: EdgeInsets.zero,
           child: Column(children: [
+            if (FileService.supported) ...[
+              ListTile(
+                leading: const Icon(Icons.save_rounded),
+                title: const Text('حفظ نسخة في مجلد الهاتف الآن', style: TextStyle(fontWeight: FontWeight.w700)),
+                subtitle: Text(
+                  store.lastAutoBackupPath != null
+                      ? 'آخر نسخة: ${store.lastAutoBackupPath!.split('/').last}'
+                      : 'تُحفظ في Documents/${FileService.appFolder}/${FileKind.backup.folder}',
+                  style: const TextStyle(color: C.muted, fontSize: 12),
+                ),
+                onTap: () => runBusy(context, 'جارٍ الحفظ…', () async {
+                  final p = await store.backupNow();
+                  if (p == null) throw Exception('تعذّر الوصول إلى مجلد الهاتف');
+                }).then((ok) {
+                  if (ok && context.mounted) toast(context, 'تم حفظ النسخة في مجلد الهاتف');
+                }),
+              ),
+              const Divider(),
+            ],
             ListTile(
-              leading: const Icon(Icons.save_alt_rounded),
-              title: const Text('حفظ نسخة احتياطية', style: TextStyle(fontWeight: FontWeight.w700)),
+              leading: const Icon(Icons.send_rounded),
+              title: const Text('إرسال نسخة احتياطية (واتساب / بريد)', style: TextStyle(fontWeight: FontWeight.w700)),
               subtitle: Text('${store.clients.length} عميل • ${store.docs.length} مستند • ${store.payments.length} دفعة — يُنشأ ملف واحد يمكنك إرساله لنفسك',
                   style: const TextStyle(color: C.muted, fontSize: 12)),
               onTap: () => runBusy(context, 'جارٍ تجهيز النسخة…', () async {
@@ -111,15 +189,70 @@ class SettingsScreen extends StatelessWidget {
               if (!context.mounted) return;
               // تأكيد ثانٍ لحماية المستخدم من الضغط بالخطأ
               if (!await confirm(context, 'تأكيد أخير', 'اضغط "مسح نهائي" فقط إذا كنت متأكدًا تمامًا.', ok: 'مسح نهائي')) return;
+              if (!context.mounted) return;
+              // إن كان القفل مفعّلًا نطلب الرمز قبل المسح
+              if (lock.enabled) {
+                final pin = await askPin(context, 'أدخل رمز القفل للتأكيد');
+                if (pin == null || !context.mounted) return;
+                if (!lock.verify(pin)) {
+                  toast(context, 'الرمز غير صحيح', error: true);
+                  return;
+                }
+              }
+              // نسخة أمان أخيرة في مجلد الهاتف قبل المسح
+              if (FileService.supported) await FileService.saveBackup(store.exportJson(), 'before-wipe-${DateTime.now().millisecondsSinceEpoch}.json');
               await store.wipe();
-              if (context.mounted) toast(context, 'تم مسح جميع البيانات');
+              if (context.mounted) toast(context, 'تم مسح جميع البيانات (حُفظت نسخة أمان في مجلد الهاتف)');
             },
           ),
         ),
         const SizedBox(height: 24),
-        const Center(child: Text('كيف الضيافة • نظام الفواتير وكشوف الحساب • v2.0', style: TextStyle(color: C.muted, fontSize: 12))),
+        const Center(child: Text('كيف الضيافة • نظام الفواتير وكشوف الحساب • v2.1', style: TextStyle(color: C.muted, fontSize: 12))),
       ]),
     );
+  }
+
+  /* ---------- القفل ---------- */
+  Future<void> _enableLock(BuildContext context, LockService lock) async {
+    final p1 = await askPin(context, 'اختر رمز القفل', hint: 'من 4 إلى 6 أرقام. احفظه جيدًا — لا يمكن استرجاعه إن نسيته.');
+    if (p1 == null || !context.mounted) return;
+    if (!LockService.isValidPin(p1)) {
+      toast(context, 'الرمز يجب أن يكون من 4 إلى 6 أرقام', error: true);
+      return;
+    }
+    final p2 = await askPin(context, 'أعد إدخال الرمز للتأكيد');
+    if (p2 == null || !context.mounted) return;
+    if (p1 != p2) {
+      toast(context, 'الرمزان غير متطابقين، حاول مرة أخرى', error: true);
+      return;
+    }
+    try {
+      await lock.setPin(p1);
+      if (context.mounted) toast(context, 'تم تفعيل قفل التطبيق');
+    } catch (e) {
+      if (context.mounted) toast(context, 'تعذّر التفعيل: $e', error: true);
+    }
+  }
+
+  Future<void> _disableLock(BuildContext context, LockService lock) async {
+    final pin = await askPin(context, 'أدخل الرمز الحالي لإلغاء القفل');
+    if (pin == null || !context.mounted) return;
+    if (!lock.verify(pin)) {
+      toast(context, 'الرمز غير صحيح', error: true);
+      return;
+    }
+    await lock.disable();
+    if (context.mounted) toast(context, 'تم إلغاء قفل التطبيق');
+  }
+
+  Future<void> _changePin(BuildContext context, LockService lock) async {
+    final cur = await askPin(context, 'أدخل الرمز الحالي');
+    if (cur == null || !context.mounted) return;
+    if (!lock.verify(cur)) {
+      toast(context, 'الرمز غير صحيح', error: true);
+      return;
+    }
+    await _enableLock(context, lock);
   }
 
   /// استرجاع من ملف عبر منتقي الملفات (الطريقة الأسهل لغير المتخصصين)

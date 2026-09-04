@@ -1,11 +1,13 @@
 /// store.dart — حالة التطبيق والتخزين المحلي (Hive) | كيف الضيافة
 library;
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
+import 'file_service.dart';
 import 'models.dart';
 
 class Store extends ChangeNotifier {
@@ -22,13 +24,17 @@ class Store extends ChangeNotifier {
   String? initError;
   bool _hiveInited = false;
 
+  /// للاختبارات: تخطي Hive.initFlutter (يُستدعى Hive.init(path) مسبقًا)
+  @visibleForTesting
+  static bool skipHiveInit = false;
+
   Future<void> init() async {
     initError = null;
     try {
-      if (!_hiveInited) {
+      if (!_hiveInited && !skipHiveInit) {
         await Hive.initFlutter();
-        _hiveInited = true;
       }
+      _hiveInited = true;
       _box = await Hive.openBox(_boxName);
       _load();
       ready = true;
@@ -87,6 +93,50 @@ class Store extends ChangeNotifier {
         await _box.put(key, org.toMap());
     }
     notifyListeners();
+    _scheduleAutoBackup();
+  }
+
+  /* ---------- النسخ الاحتياطي التلقائي إلى مجلد الهاتف ---------- */
+  Timer? _backupTimer;
+
+  /// آخر نسخة تلقائية ناجحة (مسار الملف) — للعرض في الإعدادات
+  String? lastAutoBackupPath;
+  DateTime? lastAutoBackupAt;
+
+  bool get autoBackupEnabled => (_box.get('autoBackup') as bool?) ?? true;
+  Future<void> setAutoBackup(bool v) async {
+    await _box.put('autoBackup', v);
+    notifyListeners();
+    if (v) _scheduleAutoBackup();
+  }
+
+  /// بعد أي تغيير: ننتظر 4 ثوانٍ (لتجميع التعديلات المتتالية) ثم نكتب نسخة اليوم
+  void _scheduleAutoBackup() {
+    if (!FileService.supported || !autoBackupEnabled) return;
+    _backupTimer?.cancel();
+    _backupTimer = Timer(const Duration(seconds: 4), () => backupNow(auto: true));
+  }
+
+  /// كتابة نسخة احتياطية إلى مجلد الهاتف الآن. تعيد المسار أو null
+  Future<String?> backupNow({bool auto = false}) async {
+    if (!FileService.supported) return null;
+    // لا نكتب نسخة لقاعدة فارغة تلقائيًا (قد تكون بعد مسح مقصود)
+    if (auto && clients.isEmpty && docs.isEmpty && payments.isEmpty) return null;
+    final name = auto ? 'auto-${todayISO()}.json' : 'keif-diafa-backup-${todayISO()}.json';
+    final p = await FileService.saveBackup(exportJson(), name);
+    if (p != null) {
+      lastAutoBackupPath = p;
+      lastAutoBackupAt = DateTime.now();
+      if (auto) await FileService.pruneBackups(keep: 14);
+      notifyListeners();
+    }
+    return p;
+  }
+
+  @override
+  void dispose() {
+    _backupTimer?.cancel();
+    super.dispose();
   }
 
   /* ---------- الاستعلامات ---------- */
@@ -144,10 +194,8 @@ class Store extends ChangeNotifier {
     var max = org.invStart - 1;
     for (final d in docs.where((d) => d.kind == kind)) {
       final m = RegExp(r'(\d+)\s*$').firstMatch(d.number);
-      if (m != null) {
-        final n = int.parse(m[1]!);
-        if (n > max) max = n;
-      }
+      final n = m == null ? null : int.tryParse(m[1]!);
+      if (n != null && n > max) max = n;
     }
     return '$prefix${(max + 1).toString().padLeft(org.invPad, '0')}';
   }
@@ -156,10 +204,8 @@ class Store extends ChangeNotifier {
     var max = 0;
     for (final p in payments) {
       final m = RegExp(r'REC-(\d+)').firstMatch(p.receiptNumber);
-      if (m != null) {
-        final n = int.parse(m[1]!);
-        if (n > max) max = n;
-      }
+      final n = m == null ? null : int.tryParse(m[1]!);
+      if (n != null && n > max) max = n;
     }
     return 'REC-${(max + 1).toString().padLeft(4, '0')}';
   }
@@ -298,40 +344,34 @@ class Store extends ChangeNotifier {
     if (m is! Map || m['data'] is! Map) throw const FormatException('ملف غير صالح');
     final data = m['data'] as Map;
     var n = 0;
-    for (final c in (data['clients'] as List? ?? [])) {
-      final cl = Client.fromMap(c as Map);
-      final i = clients.indexWhere((x) => x.id == cl.id);
-      if (i >= 0) {
-        clients[i] = cl;
-      } else {
-        clients.add(cl);
+    // سجل تالف واحد لا يُفشل الاسترجاع كله — نتجاوزه ونكمل
+    Iterable<Map> maps(dynamic v) => v is List ? v.whereType<Map>() : const [];
+    void upsert<T>(List<T> list, Iterable<Map> raw, T Function(Map) parse, String Function(T) id) {
+      for (final r in raw) {
+        try {
+          final item = parse(r);
+          final i = list.indexWhere((x) => id(x) == id(item));
+          if (i >= 0) {
+            list[i] = item;
+          } else {
+            list.add(item);
+          }
+          n++;
+        } catch (e) {
+          debugPrint('import: skipped corrupt record: $e');
+        }
       }
-      n++;
     }
-    final rawDocs = [...(data['docs'] as List? ?? []), ...(data['invoices'] as List? ?? [])];
-    for (final d in rawDocs) {
-      final inv = Invoice.fromMap(d as Map);
-      final i = docs.indexWhere((x) => x.id == inv.id);
-      if (i >= 0) {
-        docs[i] = inv;
-      } else {
-        docs.add(inv);
-      }
-      n++;
-    }
-    for (final p in (data['payments'] as List? ?? [])) {
-      final pay = Payment.fromMap(p as Map);
-      final i = payments.indexWhere((x) => x.id == pay.id);
-      if (i >= 0) {
-        payments[i] = pay;
-      } else {
-        payments.add(pay);
-      }
-      n++;
-    }
+
+    upsert<Client>(clients, maps(data['clients']), Client.fromMap, (c) => c.id);
+    upsert<Invoice>(docs, [...maps(data['docs']), ...maps(data['invoices'])], Invoice.fromMap, (d) => d.id);
+    upsert<Payment>(payments, maps(data['payments']), Payment.fromMap, (p) => p.id);
     if (data['org'] is Map) {
-      final old = data['org'] as Map;
-      org = Org.fromMap({...org.toMap(), ...old});
+      try {
+        org = Org.fromMap({...org.toMap(), ...(data['org'] as Map)});
+      } catch (e) {
+        debugPrint('import: org skipped: $e');
+      }
     }
     await _save('clients');
     await _save('docs');
@@ -340,10 +380,14 @@ class Store extends ChangeNotifier {
     return n;
   }
 
+  /// مسح البيانات (العملاء/المستندات/الدفعات/الإعدادات).
+  /// رمز القفل محفوظ في صندوق منفصل فلا يتأثر. النسخ الاحتياطية في مجلد الهاتف تبقى كذلك.
   Future<void> wipe() async {
+    _backupTimer?.cancel();
     clients.clear();
     docs.clear();
     payments.clear();
+    org = Org();
     await _box.clear();
     notifyListeners();
   }

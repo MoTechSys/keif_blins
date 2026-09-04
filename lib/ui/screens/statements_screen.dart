@@ -4,6 +4,7 @@ library;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/file_service.dart';
 import '../../core/models.dart';
 import '../../core/share_service.dart';
 import '../../core/store.dart';
@@ -127,6 +128,8 @@ Future<void> openStatement(BuildContext context, Client c) async {
         fileName: '${ShareService.safeName(st.number)}.pdf',
         message: ShareService.statementMessage(st, store.org),
         build: () async => (await DocPdf.create(store.org)).statement(st),
+        kind: FileKind.statement,
+        year: FileService.yearOf(st.issueDate),
       ),
     ),
   );
