@@ -51,6 +51,11 @@ android {
         }
     }
 
+    packaging {
+        // ضغط المكتبات الأصلية داخل الـAPK: يقلّل حجم التنزيل بنحو 50% (يُفكّ مرة واحدة عند التثبيت)
+        jniLibs { useLegacyPackaging = true }
+    }
+
     buildTypes {
         release {
             signingConfig = if (keystorePropertiesFile.exists()) signingConfigs.getByName("release") else signingConfigs.getByName("debug")
