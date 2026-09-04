@@ -61,13 +61,15 @@ void main() {
     final ps = <Payment>[];
     for (var i = 1; i <= 30; i++) {
       final d = '2026-${(i % 12 + 1).toString().padLeft(2, '0')}-${(i % 27 + 1).toString().padLeft(2, '0')}';
-      docs.add(Invoice(id: 'x$i', number: 'INV-${i.toString().padLeft(4, '0')}', clientId: 'c1', clientName: client.name, issueDate: d, location: 'قاعة $i', items: [LineItem(desc: 'خدمة', unitPrice: 100000 * i, qty: 1)]));
+      docs.add(Invoice(id: 'x$i', number: 'INV-${i.toString().padLeft(4, '0')}', clientId: 'c1', clientName: client.name, issueDate: d, status: 'sent', location: 'قاعة $i', items: [LineItem(desc: 'خدمة ضيافة $i', unitPrice: 100000 * i, qty: 1)]));
       if (i.isEven) ps.add(Payment(id: 'p$i', clientId: 'c1', invoiceId: 'x$i', amount: 50000 * i, date: d, receiptNumber: 'REC-${i.toString().padLeft(4, '0')}'));
     }
     final s = buildStatement(client: client, invoices: docs, payments: ps, number: 'SOA-202608-001');
+    expect(s.rows.length, greaterThanOrEqualTo(45), reason: 'المسودات فقط تُستبعد؛ المرسَلة تظهر');
     final pdf = await DocPdf.create(org);
     final bytes = await pdf.statement(s);
     expect(bytes.length, greaterThan(20000));
+    expect(RegExp(r'/Type\s*/Page[^s]').allMatches(String.fromCharCodes(bytes)).length, greaterThanOrEqualTo(2), reason: 'multi-page');
     await save('statement.pdf', bytes);
   });
 

@@ -210,7 +210,7 @@ pw.Widget royalHeader(PdfAssets a, Org org) {
         _contact(a, org.phone),
         _contact(a, org.website),
         _contact(a, org.email),
-        _contact(a, '${org.city}، ${org.kingdom}'),
+        _contact(a, '${org.city}، ${org.kingdom}', ltr: false),
       ]),
     ]),
     pw.SizedBox(height: 2.5 * mm),
@@ -231,10 +231,11 @@ pw.Widget _pill(PdfAssets a, String label, String value) => pw.Container(
       ]),
     );
 
-pw.Widget _contact(PdfAssets a, String v) => pw.Padding(
+/// سطر اتصال في الترويسة. [ltr] للأرقام/الروابط/البريد، و false للنص العربي (العنوان).
+pw.Widget _contact(PdfAssets a, String v, {bool ltr = true}) => pw.Padding(
       padding: const pw.EdgeInsets.only(bottom: 0.9 * mm),
       child: pw.Row(mainAxisSize: pw.MainAxisSize.min, children: [
-        pw.Text(v, style: a.t(7.6, color: K.navy), textDirection: pw.TextDirection.ltr),
+        pw.Text(v, style: a.t(7.6, color: K.navy), textDirection: ltr ? pw.TextDirection.ltr : pw.TextDirection.rtl),
         pw.SizedBox(width: 1.5 * mm),
         pw.Container(width: 1.6 * mm, height: 1.6 * mm, decoration: const pw.BoxDecoration(color: K.gold, shape: pw.BoxShape.circle)),
       ]),
