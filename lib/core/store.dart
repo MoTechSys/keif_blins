@@ -18,26 +18,55 @@ class Store extends ChangeNotifier {
   Org org = Org();
   bool ready = false;
 
+  /// رسالة خطأ التشغيل (إن فشل فتح قاعدة البيانات) — null يعني لا خطأ
+  String? initError;
+  bool _hiveInited = false;
+
   Future<void> init() async {
-    await Hive.initFlutter();
-    _box = await Hive.openBox(_boxName);
-    _load();
-    ready = true;
+    initError = null;
+    try {
+      if (!_hiveInited) {
+        await Hive.initFlutter();
+        _hiveInited = true;
+      }
+      _box = await Hive.openBox(_boxName);
+      _load();
+      ready = true;
+    } catch (e, st) {
+      debugPrint('Store.init failed: $e\n$st');
+      initError = '$e';
+      ready = false;
+    }
     notifyListeners();
   }
 
   void _load() {
+    // سجل تالف واحد لا يجب أن يمنع تحميل الباقي
+    Iterable<T> safe<T>(String key, T Function(Map) parse) sync* {
+      for (final m in _list(key)) {
+        try {
+          yield parse(m);
+        } catch (e) {
+          debugPrint('skip corrupt $key record: $e');
+        }
+      }
+    }
+
     clients
       ..clear()
-      ..addAll(_list('clients').map((m) => Client.fromMap(m)));
+      ..addAll(safe('clients', (m) => Client.fromMap(m)));
     docs
       ..clear()
-      ..addAll(_list('docs').map((m) => Invoice.fromMap(m)));
+      ..addAll(safe('docs', (m) => Invoice.fromMap(m)));
     payments
       ..clear()
-      ..addAll(_list('payments').map((m) => Payment.fromMap(m)));
+      ..addAll(safe('payments', (m) => Payment.fromMap(m)));
     final o = _box.get('org');
-    org = Org.fromMap(o is Map ? o : null);
+    try {
+      org = Org.fromMap(o is Map ? o : null);
+    } catch (_) {
+      org = Org();
+    }
   }
 
   Iterable<Map> _list(String key) {
@@ -135,10 +164,16 @@ class Store extends ChangeNotifier {
     return 'REC-${(max + 1).toString().padLeft(4, '0')}';
   }
 
+  /// رقم الكشف: SOA-سنةشهر-رمز ثابت للعميل
+  /// (مشتق من معرّف العميل فلا يتغير بحذف أو إضافة عملاء آخرين)
   String statementNumber(Client c) {
     final d = todayISO();
-    final idx = clients.indexWhere((x) => x.id == c.id) + 1;
-    return 'SOA-${d.substring(0, 4)}${d.substring(5, 7)}-${idx.toString().padLeft(3, '0')}';
+    var h = 0;
+    for (final u in c.id.codeUnits) {
+      h = (h * 31 + u) & 0x7fffffff;
+    }
+    final code = (h % 900 + 100).toString();
+    return 'SOA-${d.substring(0, 4)}${d.substring(5, 7)}-$code';
   }
 
   /* ---------- العملاء ---------- */

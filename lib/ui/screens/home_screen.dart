@@ -29,12 +29,11 @@ class HomeScreen extends StatelessWidget {
       children: [
         // الترويسة
         Row(children: [
-          Container(
-            width: 46,
-            height: 46,
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: C.gold, width: 1.2)),
-            child: const Image(image: AssetImage('assets/img/logo.png')),
+          // الشعار مباشرة على الخلفية بدون صندوق أبيض
+          const SizedBox(
+            width: 52,
+            height: 52,
+            child: Image(image: AssetImage('assets/img/logo.png'), fit: BoxFit.contain),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -50,6 +49,18 @@ class HomeScreen extends StatelessWidget {
           ),
         ]),
         const SizedBox(height: 16),
+
+        // دليل البداية السريع — يظهر فقط للمستخدم الجديد ويختفي تلقائيًا
+        if (store.clients.isEmpty || store.invoices.isEmpty) ...[
+          _GettingStarted(
+            hasClient: store.clients.isNotEmpty,
+            hasInvoice: store.invoices.isNotEmpty,
+            onAddClient: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ClientForm())),
+            onAddInvoice: () => _newDoc(context, DocKind.invoice),
+            onSettings: () => onNavigate(4),
+          ),
+          const SizedBox(height: 12),
+        ],
 
         // بطاقة الرصيد
         Container(
@@ -150,6 +161,80 @@ class HomeScreen extends StatelessWidget {
       return;
     }
     Navigator.push(context, MaterialPageRoute(builder: (_) => const PaymentForm()));
+  }
+}
+
+/// بطاقة خطوات البداية (3 خطوات واضحة لغير المتخصصين)
+class _GettingStarted extends StatelessWidget {
+  final bool hasClient, hasInvoice;
+  final VoidCallback onAddClient, onAddInvoice, onSettings;
+  const _GettingStarted({required this.hasClient, required this.hasInvoice, required this.onAddClient, required this.onAddInvoice, required this.onSettings});
+
+  @override
+  Widget build(BuildContext context) {
+    return GoldCard(
+      color: C.card2,
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Row(children: [
+          Icon(Icons.auto_awesome_rounded, color: C.gold, size: 20),
+          SizedBox(width: 8),
+          Text('أهلًا بك — ابدأ في 3 خطوات', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+        ]),
+        const SizedBox(height: 4),
+        const Text('هذه البطاقة تختفي تلقائيًا بعد إنشاء أول فاتورة.', style: TextStyle(color: C.muted, fontSize: 12)),
+        const SizedBox(height: 12),
+        _Step(1, 'راجع بيانات مؤسستك', 'الاسم، الهاتف، الحساب البنكي — تظهر في كل فاتورة', done: false, onTap: onSettings, optional: true),
+        _Step(2, 'أضف أول عميل', 'يكفي الاسم فقط، والباقي اختياري', done: hasClient, onTap: onAddClient),
+        _Step(3, 'أنشئ فاتورة وشاركها', 'اختر العميل، أضف البنود، ثم اضغط "مشاركة" لإرسالها على واتساب', done: hasInvoice, onTap: hasClient ? onAddInvoice : null),
+      ]),
+    );
+  }
+}
+
+class _Step extends StatelessWidget {
+  final int n;
+  final String title, hint;
+  final bool done, optional;
+  final VoidCallback? onTap;
+  const _Step(this.n, this.title, this.hint, {required this.done, this.onTap, this.optional = false});
+  @override
+  Widget build(BuildContext context) {
+    final enabled = onTap != null;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 7, horizontal: 2),
+        child: Row(children: [
+          Container(
+            width: 30,
+            height: 30,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: done ? C.green : (enabled ? C.gold : C.line),
+            ),
+            child: done
+                ? const Icon(Icons.check_rounded, size: 18, color: Colors.white)
+                : Text('$n', style: TextStyle(color: enabled ? C.bg : C.muted, fontWeight: FontWeight.w900)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: enabled || done ? C.text : C.muted, decoration: done ? TextDecoration.lineThrough : null)),
+                if (optional) ...[
+                  const SizedBox(width: 6),
+                  const Text('(اختياري)', style: TextStyle(color: C.muted, fontSize: 11)),
+                ],
+              ]),
+              Text(hint, style: const TextStyle(color: C.muted, fontSize: 12)),
+            ]),
+          ),
+          if (enabled && !done) const Icon(Icons.chevron_left_rounded, color: C.gold),
+        ]),
+      ),
+    );
   }
 }
 

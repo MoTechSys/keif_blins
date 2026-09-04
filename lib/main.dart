@@ -9,6 +9,7 @@ import 'ui/theme.dart';
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   final store = Store();
+  // التهيئة غير محجوبة: الواجهة تعرض شاشة تحميل، وعند الفشل تعرض رسالة وزر "إعادة المحاولة"
   store.init();
   runApp(KeifApp(store: store));
 }

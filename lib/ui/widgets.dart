@@ -201,6 +201,41 @@ void toast(BuildContext context, String msg, {bool error = false}) {
     ));
 }
 
+/// تنفيذ عملية طويلة (إنشاء PDF / مشاركة) مع مؤشر انتظار ورسالة خطأ واضحة
+Future<bool> runBusy(BuildContext context, String label, Future<void> Function() task) async {
+  showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => PopScope(
+      canPop: false,
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 22),
+          decoration: BoxDecoration(color: C.bg2, borderRadius: BorderRadius.circular(18), border: Border.all(color: C.line)),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 14),
+            Text(label, style: const TextStyle(fontWeight: FontWeight.w700, color: C.text, decoration: TextDecoration.none, fontSize: 14)),
+          ]),
+        ),
+      ),
+    ),
+  );
+  var ok = true;
+  Object? err;
+  try {
+    await task();
+  } catch (e) {
+    ok = false;
+    err = e;
+  }
+  if (context.mounted) {
+    Navigator.of(context, rootNavigator: true).pop();
+    if (!ok) toast(context, 'تعذّر تنفيذ العملية: $err', error: true);
+  }
+  return ok;
+}
+
 Future<bool> confirm(BuildContext context, String title, String body, {String ok = 'حذف', bool danger = true}) async {
   final r = await showDialog<bool>(
     context: context,

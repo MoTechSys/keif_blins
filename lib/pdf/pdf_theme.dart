@@ -171,16 +171,10 @@ void _corner(PdfGraphics c, double x, double y, int dx, int dy, double s) {
 pw.Widget royalHeader(PdfAssets a, Org org) {
   return pw.Column(children: [
     pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.center, children: [
-      // الشعار داخل إطار ذهبي رفيع
-      pw.Container(
-        width: 24 * mm,
-        height: 24 * mm,
-        padding: const pw.EdgeInsets.all(1.2 * mm),
-        decoration: pw.BoxDecoration(
-          border: pw.Border.all(color: K.gold, width: 0.4),
-          borderRadius: pw.BorderRadius.circular(2 * mm),
-          color: K.white,
-        ),
+      // الشعار مباشرة على الخلفية بدون صندوق
+      pw.SizedBox(
+        width: 26 * mm,
+        height: 26 * mm,
         child: pw.Image(a.logo, fit: pw.BoxFit.contain),
       ),
       pw.SizedBox(width: 4 * mm),

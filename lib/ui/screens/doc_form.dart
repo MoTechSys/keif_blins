@@ -55,6 +55,17 @@ class _DocFormState extends State<DocForm> {
     }
   }
 
+  @override
+  void dispose() {
+    for (final t in [location, attendees, discount, deposit, notes, terms]) {
+      t.dispose();
+    }
+    for (final it in items) {
+      it.dispose();
+    }
+    super.dispose();
+  }
+
   void _sync() {
     d.items = items.map((c) => c.toItem()).toList();
     d.discount = toHalalasPositive(discount.text);
@@ -221,7 +232,7 @@ class _DocFormState extends State<DocForm> {
             Expanded(child: Money(c.toItem().total, size: 15, color: C.goldLight)),
             IconButton(
               icon: const Icon(Icons.delete_outline, color: C.red, size: 20),
-              onPressed: items.length == 1 ? null : () => setState(() => items.removeAt(i)),
+              onPressed: items.length == 1 ? null : () => setState(() => items.removeAt(i).dispose()),
             ),
           ]),
           Field('وصف الخدمة (السطر الأول عنوان، والباقي تفاصيل)', controller: c.desc, maxLines: 3, validator: (v) => (v ?? '').trim().isEmpty ? 'مطلوب' : null),
@@ -289,6 +300,13 @@ class _ItemCtl {
         qty = TextEditingController(text: fmtQty(li.qty)),
         external = TextEditingController(text: li.external == 0 ? '' : fmt(li.external, trimZeros: true)),
         unit = li.unitLabel;
+
+  void dispose() {
+    desc.dispose();
+    price.dispose();
+    qty.dispose();
+    external.dispose();
+  }
 
   LineItem toItem() => LineItem(
         id: id,

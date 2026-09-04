@@ -41,6 +41,14 @@ class _PaymentFormState extends State<PaymentForm> {
   }
 
   @override
+  void dispose() {
+    amount.dispose();
+    reference.dispose();
+    notes.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final store = context.watch<Store>();
     final openInvs = store.clientInvoices(p.clientId).where((i) => i.countsInLedger && (invoiceRemaining(i, store.payments) > 0 || i.id == p.invoiceId)).toList();

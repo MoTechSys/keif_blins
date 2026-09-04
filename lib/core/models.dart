@@ -24,7 +24,9 @@ String fmtDate(String? iso) {
   if (iso == null || iso.isEmpty) return '';
   final p = iso.split('-');
   if (p.length < 3) return iso;
-  return '${p[0]}/${int.tryParse(p[1]) ?? p[1]}/${int.tryParse(p[2].substring(0, 2)) ?? p[2]}';
+  // اليوم قد يكون "04" أو "4" أو "04T10:00:00" — نأخذ الأرقام الأولى فقط
+  final dayDigits = RegExp(r'^\d{1,2}').firstMatch(p[2])?.group(0) ?? p[2];
+  return '${p[0]}/${int.tryParse(p[1]) ?? p[1]}/${int.tryParse(dayDigits) ?? dayDigits}';
 }
 
 /// ISO → "أغسطس 2026"

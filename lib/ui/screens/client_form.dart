@@ -30,6 +30,14 @@ class _ClientFormState extends State<ClientForm> {
   late final opening = TextEditingController(text: c.openingBalance == 0 ? '' : fmt(c.openingBalance, trimZeros: true));
 
   @override
+  void dispose() {
+    for (final t in [name, contact, phone, email, vat, cr, address, notes, opening]) {
+      t.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text(widget.client == null ? 'عميل جديد' : 'تعديل العميل')),

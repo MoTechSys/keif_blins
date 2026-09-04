@@ -3,6 +3,7 @@ library;
 
 import 'dart:convert';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -26,12 +27,11 @@ class SettingsScreen extends StatelessWidget {
         GoldCard(
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const OrgForm())),
           child: Row(children: [
-            Container(
-              width: 54,
-              height: 54,
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: C.gold)),
-              child: const Image(image: AssetImage('assets/img/logo.png')),
+            // الشعار مباشرة على الخلفية بدون صندوق أبيض
+            const SizedBox(
+              width: 58,
+              height: 58,
+              child: Image(image: AssetImage('assets/img/logo.png'), fit: BoxFit.contain),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -61,39 +61,60 @@ class SettingsScreen extends StatelessWidget {
             ),
           ]),
         ),
-        const SectionTitle('النسخ الاحتياطي'),
+        const SectionTitle('النسخة الاحتياطية'),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+          child: Text(
+            'بياناتك محفوظة على هذا الجهاز فقط. احفظ نسخة احتياطية بشكل دوري (مثلًا كل أسبوع) وأرسلها لنفسك على واتساب أو البريد، حتى لا تفقد شيئًا لو ضاع الجهاز أو تغيّر.',
+            style: TextStyle(color: C.muted, fontSize: 12.5, height: 1.5),
+          ),
+        ),
         GoldCard(
           padding: EdgeInsets.zero,
           child: Column(children: [
             ListTile(
-              leading: const Icon(Icons.upload_file_rounded),
-              title: const Text('تصدير نسخة احتياطية', style: TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: Text('${store.clients.length} عميل • ${store.docs.length} مستند • ${store.payments.length} دفعة', style: const TextStyle(color: C.muted, fontSize: 12)),
-              onTap: () async {
+              leading: const Icon(Icons.save_alt_rounded),
+              title: const Text('حفظ نسخة احتياطية', style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: Text('${store.clients.length} عميل • ${store.docs.length} مستند • ${store.payments.length} دفعة — يُنشأ ملف واحد يمكنك إرساله لنفسك',
+                  style: const TextStyle(color: C.muted, fontSize: 12)),
+              onTap: () => runBusy(context, 'جارٍ تجهيز النسخة…', () async {
                 final json = store.exportJson();
                 final name = 'keif-diafa-backup-${todayISO()}.json';
                 await Share.shareXFiles([XFile.fromData(utf8.encode(json), mimeType: 'application/json', name: name)], subject: name);
-              },
+              }),
             ),
             const Divider(),
             ListTile(
-              leading: const Icon(Icons.download_rounded),
-              title: const Text('استيراد نسخة (لصق JSON)', style: TextStyle(fontWeight: FontWeight.w700)),
-              subtitle: const Text('يدعم نسخ التطبيق السابق', style: TextStyle(color: C.muted, fontSize: 12)),
+              leading: const Icon(Icons.restore_rounded),
+              title: const Text('استرجاع نسخة احتياطية', style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: const Text('اختر ملف النسخة (keif-diafa-backup-…json) من جهازك', style: TextStyle(color: C.muted, fontSize: 12)),
+              onTap: () => _importFromFile(context, store),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.content_paste_rounded),
+              title: const Text('استرجاع بلصق النص (للمتقدمين)', style: TextStyle(fontWeight: FontWeight.w700)),
+              subtitle: const Text('إن تعذّر اختيار الملف: افتح ملف النسخة، انسخ محتواه كاملًا ثم الصقه هنا', style: TextStyle(color: C.muted, fontSize: 12)),
               onTap: () => _import(context, store),
             ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.delete_forever_rounded, color: C.red),
-              title: const Text('مسح جميع البيانات', style: TextStyle(fontWeight: FontWeight.w700, color: C.red)),
-              onTap: () async {
-                if (await confirm(context, 'مسح كل البيانات', 'سيتم حذف العملاء والفواتير والدفعات نهائيًا. صدّر نسخة احتياطية أولًا.', ok: 'مسح الكل')) {
-                  await store.wipe();
-                  if (context.mounted) toast(context, 'تم مسح البيانات');
-                }
-              },
-            ),
           ]),
+        ),
+        const SectionTitle('منطقة الخطر'),
+        GoldCard(
+          padding: EdgeInsets.zero,
+          child: ListTile(
+            leading: const Icon(Icons.delete_forever_rounded, color: C.red),
+            title: const Text('مسح جميع البيانات', style: TextStyle(fontWeight: FontWeight.w700, color: C.red)),
+            subtitle: const Text('لا يمكن التراجع. احفظ نسخة احتياطية أولًا.', style: TextStyle(color: C.muted, fontSize: 12)),
+            onTap: () async {
+              if (!await confirm(context, 'مسح كل البيانات', 'سيتم حذف جميع العملاء والفواتير والدفعات نهائيًا ولا يمكن استرجاعها.\n\nهل حفظت نسخة احتياطية؟', ok: 'نعم، امسح الكل')) return;
+              if (!context.mounted) return;
+              // تأكيد ثانٍ لحماية المستخدم من الضغط بالخطأ
+              if (!await confirm(context, 'تأكيد أخير', 'اضغط "مسح نهائي" فقط إذا كنت متأكدًا تمامًا.', ok: 'مسح نهائي')) return;
+              await store.wipe();
+              if (context.mounted) toast(context, 'تم مسح جميع البيانات');
+            },
+          ),
         ),
         const SizedBox(height: 24),
         const Center(child: Text('كيف الضيافة • نظام الفواتير وكشوف الحساب • v2.0', style: TextStyle(color: C.muted, fontSize: 12))),
@@ -101,6 +122,37 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 
+  /// استرجاع من ملف عبر منتقي الملفات (الطريقة الأسهل لغير المتخصصين)
+  Future<void> _importFromFile(BuildContext context, Store store) async {
+    FilePickerResult? res;
+    try {
+      res = await FilePicker.pickFiles(
+        dialogTitle: 'اختر ملف النسخة الاحتياطية',
+        type: FileType.any,
+        withData: true,
+      );
+    } catch (e) {
+      if (context.mounted) toast(context, 'تعذّر فتح منتقي الملفات: $e', error: true);
+      return;
+    }
+    if (res == null || res.files.isEmpty || !context.mounted) return;
+    final f = res.files.first;
+    final bytes = f.bytes;
+    if (bytes == null) {
+      toast(context, 'تعذّر قراءة الملف. جرّب طريقة "لصق النص".', error: true);
+      return;
+    }
+    String text;
+    try {
+      text = utf8.decode(bytes);
+    } catch (_) {
+      toast(context, 'هذا الملف ليس نسخة احتياطية صالحة.', error: true);
+      return;
+    }
+    await _applyImport(context, store, text, sourceName: f.name);
+  }
+
+  /// استرجاع بلصق النص (احتياطي)
   Future<void> _import(BuildContext context, Store store) async {
     final ctl = TextEditingController();
     final clip = await Clipboard.getData('text/plain');
@@ -109,20 +161,51 @@ class SettingsScreen extends StatelessWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('استيراد نسخة احتياطية'),
-        content: TextField(controller: ctl, maxLines: 8, style: const TextStyle(fontSize: 11, fontFamily: 'monospace'), decoration: const InputDecoration(hintText: 'الصق محتوى ملف JSON هنا')),
+        title: const Text('استرجاع بلصق النص'),
+        content: TextField(controller: ctl, maxLines: 8, style: const TextStyle(fontSize: 11, fontFamily: 'monospace'), decoration: const InputDecoration(hintText: 'الصق محتوى ملف النسخة هنا')),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('استيراد')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('استرجاع')),
         ],
       ),
     );
+    final text = ctl.text;
+    ctl.dispose();
     if (ok != true || !context.mounted) return;
+    await _applyImport(context, store, text);
+  }
+
+  Future<void> _applyImport(BuildContext context, Store store, String text, {String? sourceName}) async {
+    if (text.trim().isEmpty) {
+      toast(context, 'لا يوجد محتوى للاسترجاع.', error: true);
+      return;
+    }
+    // تحقق مسبق حتى لا نسأل المستخدم عن ملف غير صالح
+    Map? parsed;
     try {
-      final n = await store.importJson(ctl.text);
-      if (context.mounted) toast(context, 'تم استيراد $n سجلًا');
+      final m = jsonDecode(text);
+      if (m is Map && m['data'] is Map) parsed = m['data'] as Map;
+    } catch (_) {}
+    if (parsed == null) {
+      toast(context, 'هذا الملف ليس نسخة احتياطية من كيف الضيافة.', error: true);
+      return;
+    }
+    final nc = (parsed['clients'] as List?)?.length ?? 0;
+    final nd = ((parsed['docs'] as List?)?.length ?? 0) + ((parsed['invoices'] as List?)?.length ?? 0);
+    final np = (parsed['payments'] as List?)?.length ?? 0;
+    final go = await confirm(
+      context,
+      'استرجاع النسخة الاحتياطية',
+      '${sourceName != null ? 'الملف: $sourceName\n\n' : ''}تحتوي النسخة على: $nc عميل • $nd مستند • $np دفعة.\n\nسيتم إضافتها إلى بياناتك الحالية (وتحديث السجلات المتطابقة) دون حذف أي شيء.',
+      ok: 'استرجاع',
+      danger: false,
+    );
+    if (!go || !context.mounted) return;
+    try {
+      final n = await store.importJson(text);
+      if (context.mounted) toast(context, 'تم استرجاع $n سجلًا بنجاح');
     } catch (e) {
-      if (context.mounted) toast(context, 'ملف غير صالح: $e', error: true);
+      if (context.mounted) toast(context, 'تعذّر الاسترجاع: $e', error: true);
     }
   }
 }
@@ -156,6 +239,14 @@ class _OrgFormState extends State<OrgForm> {
     'invoiceTerms': TextEditingController(text: o.invoiceTerms),
     'quoteTerms': TextEditingController(text: o.quoteTerms),
   };
+
+  @override
+  void dispose() {
+    for (final t in c.values) {
+      t.dispose();
+    }
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

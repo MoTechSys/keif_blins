@@ -104,6 +104,12 @@ void main() {
   test('fmtDate', () {
     expect(fmtDate('2026-08-04'), '2026/8/4');
     expect(fmtMonth('2026-08-04'), 'أغسطس 2026');
+    // بيانات قديمة/مستوردة بصيغ غير مضبوطة يجب ألا تُسقط التطبيق
+    expect(fmtDate('2026-8-4'), '2026/8/4');
+    expect(fmtDate('2026-08-04T10:30:00.000'), '2026/8/4');
+    expect(fmtDate(''), '');
+    expect(fmtDate(null), '');
+    expect(fmtDate('غير صالح'), 'غير صالح');
   });
 
   test('Org iban spacing and defaults', () {

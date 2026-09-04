@@ -122,11 +122,11 @@ class DocDetail extends StatelessWidget {
         Row(children: [
           Expanded(
             child: OutlinedButton.icon(
-              onPressed: () async {
+              onPressed: () => runBusy(context, 'جارٍ تجهيز الملف…', () async {
                 final pdf = await DocPdf.create(store.org);
                 final bytes = await pdf.invoice(d, store.payments, client: client);
                 await ShareService.sharePdf(bytes, '${ShareService.safeName(d.number)}.pdf', ShareService.invoiceMessage(d, store.org, store.payments));
-              },
+              }),
               icon: const Icon(Icons.share_rounded, size: 18),
               label: const Text('مشاركة سريعة'),
             ),
