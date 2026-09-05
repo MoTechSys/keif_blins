@@ -325,6 +325,27 @@ class Store extends ChangeNotifier {
     await _save('org');
   }
 
+  /* ---------- الحساب / شاشة الدخول ---------- */
+  /// هل اختار المستخدم طريقة الدخول (Google أو بدون تسجيل)؟
+  bool get signedIn => (_box.get('signedIn') as bool?) ?? false;
+  String get accountName => (_box.get('accountName') as String?) ?? '';
+  String get accountEmail => (_box.get('accountEmail') as String?) ?? '';
+  String get accountPhoto => (_box.get('accountPhoto') as String?) ?? '';
+  Future<void> setAccount({String name = '', String email = '', String photo = ''}) async {
+    await _box.put('signedIn', true);
+    await _box.put('accountName', name);
+    await _box.put('accountEmail', email);
+    await _box.put('accountPhoto', photo);
+    notifyListeners();
+  }
+  Future<void> signOut() async {
+    await _box.put('signedIn', false);
+    await _box.put('accountName', '');
+    await _box.put('accountEmail', '');
+    await _box.put('accountPhoto', '');
+    notifyListeners();
+  }
+
   String get themeKey => org.theme;
   Future<void> setTheme(String key) async {
     org.theme = key;

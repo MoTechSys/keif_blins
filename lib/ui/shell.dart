@@ -11,6 +11,7 @@ import 'screens/clients_screen.dart';
 import 'screens/docs_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/lock_screen.dart';
+import 'screens/signin_screen.dart';
 import 'screens/statements_screen.dart';
 import 'theme.dart';
 import 'widgets.dart';
@@ -62,6 +63,8 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     final initError = context.select<Store, String?>((s) => s.initError);
     final lockReady = context.select<LockService, bool>((l) => l.initialized);
     final locked = context.select<LockService, bool>((l) => l.locked);
+    final signedIn = context.select<Store, bool>((s) => s.signedIn);
+    if (ready && lockReady && !signedIn) return const SignInScreen();
     if (ready && lockReady && locked) return const LockScreen();
     if (!ready || !lockReady) {
       return Scaffold(

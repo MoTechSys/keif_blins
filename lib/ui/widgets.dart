@@ -462,3 +462,51 @@ class KpiTile extends StatelessWidget {
         ),
       );
 }
+
+/// قسم قابل للطي — يُخفي التعقيد حتى يحتاجه المستخدم
+class Expander extends StatelessWidget {
+  final String title, hint;
+  final IconData icon;
+  final bool open;
+  final VoidCallback onToggle;
+  final Widget child;
+  const Expander({super.key, required this.title, required this.hint, required this.icon, required this.open, required this.onToggle, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        decoration: BoxDecoration(color: C.surface, borderRadius: BorderRadius.circular(16), border: Border.all(color: C.line)),
+        child: Column(children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: onToggle,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 10, 12),
+              child: Row(children: [
+                Icon(icon, color: C.gold, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: C.text)),
+                    Text(hint, style: TextStyle(color: C.text3, fontSize: 11.5)),
+                  ]),
+                ),
+                AnimatedRotation(turns: open ? 0.5 : 0, duration: const Duration(milliseconds: 200), child: Icon(Icons.expand_more_rounded, color: C.text2)),
+              ]),
+            ),
+          ),
+          AnimatedSize(
+            duration: const Duration(milliseconds: 220),
+            curve: Curves.easeOut,
+            alignment: Alignment.topCenter,
+            child: open
+                ? Padding(padding: const EdgeInsets.fromLTRB(14, 4, 14, 2), child: child)
+                : const SizedBox(width: double.infinity),
+          ),
+        ]),
+      ),
+    );
+  }
+}

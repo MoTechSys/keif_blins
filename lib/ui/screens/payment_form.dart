@@ -28,6 +28,7 @@ class _PaymentFormState extends State<PaymentForm> {
   final _f = GlobalKey<FormState>();
   late Payment p;
   late final TextEditingController amount, reference, notes;
+  bool _more = false;
 
   @override
   void initState() {
@@ -35,10 +36,11 @@ class _PaymentFormState extends State<PaymentForm> {
     final store = context.read<Store>();
     p = widget.payment != null
         ? Payment.fromMap(widget.payment!.toMap())
-        : Payment(clientId: widget.clientId ?? store.clients.first.id, invoiceId: widget.invoiceId ?? '', amount: widget.suggested ?? 0);
+        : Payment(clientId: widget.clientId ?? (store.clients.isNotEmpty ? store.clients.first.id : ''), invoiceId: widget.invoiceId ?? '', amount: widget.suggested ?? 0);
     amount = TextEditingController(text: p.amount == 0 ? '' : fmt(p.amount, trimZeros: true));
     reference = TextEditingController(text: p.reference);
     notes = TextEditingController(text: p.notes);
+    _more = p.reference.isNotEmpty || p.notes.isNotEmpty;
   }
 
   @override
@@ -73,9 +75,9 @@ class _PaymentFormState extends State<PaymentForm> {
       ),
       body: Form(
         key: _f,
-        child: ListView(padding: const EdgeInsets.all(16), children: [
+        child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 110), children: [
           DropdownButtonFormField<String>(
-            initialValue: store.clients.any((c) => c.id == p.clientId) ? p.clientId : store.clients.first.id,
+            initialValue: store.clients.any((c) => c.id == p.clientId) ? p.clientId : (store.clients.isNotEmpty ? store.clients.first.id : null),
             decoration: InputDecoration(labelText: 'العميل', prefixIcon: Icon(Icons.business_outlined, color: C.muted, size: 20)),
             dropdownColor: C.bg2,
             items: [for (final c in store.clients) DropdownMenuItem(value: c.id, child: Text(c.name, overflow: TextOverflow.ellipsis))],
@@ -126,18 +128,39 @@ class _PaymentFormState extends State<PaymentForm> {
             onChanged: (v) => setState(() => p.method = v!),
           ),
           const SizedBox(height: 12),
-          Field('رقم العملية / المرجع', controller: reference, icon: Icons.tag, direction: TextDirection.ltr),
-          Field('ملاحظات', controller: notes, icon: Icons.notes_outlined, maxLines: 2),
-          const SizedBox(height: 8),
-          FilledButton.icon(onPressed: () => _save(preview: false), icon: const Icon(Icons.save_rounded), label: const Text('حفظ')),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(onPressed: () => _save(preview: true), icon: const Icon(Icons.picture_as_pdf_rounded), label: const Text('حفظ وإصدار سند قبض')),
+          Expander(
+            title: 'تفاصيل إضافية',
+            hint: 'رقم العملية البنكية، ملاحظات — اختياري',
+            icon: Icons.tag_rounded,
+            open: _more,
+            onToggle: () => setState(() => _more = !_more),
+            child: Column(children: [
+              Field('رقم العملية / المرجع', controller: reference, icon: Icons.tag, direction: TextDirection.ltr),
+              Field('ملاحظات', controller: notes, icon: Icons.notes_outlined, maxLines: 2),
+            ]),
+          ),
         ]),
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+          decoration: BoxDecoration(color: C.bg2, border: Border(top: BorderSide(color: C.line))),
+          child: Row(children: [
+            Expanded(child: OutlinedButton.icon(onPressed: () => _save(preview: false), icon: const Icon(Icons.check_rounded, size: 18), label: const Text('حفظ فقط'))),
+            const SizedBox(width: 10),
+            Expanded(flex: 3, child: FilledButton.icon(onPressed: () => _save(preview: true), icon: const Icon(Icons.receipt_rounded, size: 18), label: const Text('حفظ وإصدار سند قبض'))),
+          ]),
+        ),
       ),
     );
   }
 
   Future<void> _save({required bool preview}) async {
+    final store0 = context.read<Store>();
+    if (!store0.clients.any((c) => c.id == p.clientId)) {
+      toast(context, 'اختر العميل أولًا', error: true);
+      return;
+    }
     if (!_f.currentState!.validate()) return;
     p
       ..amount = toHalalasPositive(amount.text)
