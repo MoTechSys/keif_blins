@@ -17,7 +17,7 @@ class O {
   static const gold = PdfColor.fromInt(0xFFB8894A); // خطوط وأرقام مميزة
   static const red = PdfColor.fromInt(0xFFB3372E); // المتبقي
   static const headFill = PdfColor.fromInt(0xFFF0E3CC); // رأس الجدول
-  static const line = PdfColor.fromInt(0xFFCCBDA8); // حدود الجدول
+  static const line = PdfColor.fromInt(0xFFB5A386); // حدود الجدول (أوضح قليلاً)
   static const white = PdfColors.white;
 }
 
@@ -162,7 +162,15 @@ pw.Widget metaBlock(PdfAssets a, {required List<(String, String, bool)> right, r
 /* ---------- الجدول ---------- */
 pw.BoxDecoration headDeco() => const pw.BoxDecoration(color: O.headFill);
 
-pw.TableBorder tableBorder() => pw.TableBorder.all(color: O.line, width: 0.6);
+/// حدود الجدول: الإطار الخارجي أوضح قليلاً من خطوط الصفوف/الأعمدة الداخلية.
+pw.TableBorder tableBorder() => const pw.TableBorder(
+      left: pw.BorderSide(color: O.line, width: 1.1),
+      right: pw.BorderSide(color: O.line, width: 1.1),
+      top: pw.BorderSide(color: O.line, width: 1.1),
+      bottom: pw.BorderSide(color: O.line, width: 1.1),
+      horizontalInside: pw.BorderSide(color: O.line, width: 0.85),
+      verticalInside: pw.BorderSide(color: O.line, width: 0.85),
+    );
 
 pw.Widget oth(PdfAssets a, String t, {double size = 10.8}) => pw.Container(
       alignment: pw.Alignment.center,

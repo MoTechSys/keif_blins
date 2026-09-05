@@ -80,10 +80,11 @@ class DocPdf {
         pw.SizedBox(height: 14),
         _itemsTable(inv, hasExt),
         pw.SizedBox(height: 12),
-        // كتلة الإجماليات يسار
+        // كتلة الإجماليات مثبّتة على يسار الصفحة (كالمرجع): في صف RTL أول عنصر يقع يميناً، لذا الفراغ أولاً
         pw.Row(children: [
+          pw.Spacer(),
           pw.SizedBox(
-            width: 255,
+            width: 300,
             child: pw.Column(children: [
               singleRule(width: 1.2),
               pw.SizedBox(height: 8),
@@ -99,7 +100,6 @@ class DocPdf {
                 _sumLine('المتبقي', fmtSAR(remaining), color: remaining > 0 ? O.red : O.brown, bold: true),
             ]),
           ),
-          pw.Spacer(),
         ]),
         if (inv.notes.trim().isNotEmpty) pw.SizedBox(height: 10),
         if (inv.notes.trim().isNotEmpty)
@@ -138,15 +138,18 @@ class DocPdf {
   pw.Widget _itemsTable(Invoice inv, bool hasExt) {
     final qtyHead = _qtyHeader(inv);
     final mixedUnits = qtyHead == 'الكمية';
+    // الأعمدة من اليمين: م | الوصف | الكمية | السعر | [مشتريات خارجية] | الإجمالي
     final widths = <int, pw.TableColumnWidth>{
-      0: const pw.FlexColumnWidth(),
-      1: const pw.FixedColumnWidth(69),
-      2: const pw.FixedColumnWidth(79),
-      if (hasExt) 3: const pw.FixedColumnWidth(72),
-      (hasExt ? 4 : 3): const pw.FixedColumnWidth(78),
+      0: const pw.FixedColumnWidth(24),
+      1: const pw.FlexColumnWidth(),
+      2: const pw.FixedColumnWidth(69),
+      3: const pw.FixedColumnWidth(79),
+      if (hasExt) 4: const pw.FixedColumnWidth(72),
+      (hasExt ? 5 : 4): const pw.FixedColumnWidth(78),
     };
     final rows = <pw.TableRow>[
       pw.TableRow(repeat: true, decoration: headDeco(), children: [
+        oth(a, 'م'),
         oth(a, 'الوصف'),
         oth(a, qtyHead),
         oth(a, 'السعر'),
@@ -154,8 +157,11 @@ class DocPdf {
         oth(a, 'الإجمالي'),
       ]),
     ];
+    var i = 0;
     for (final li in inv.items) {
+      i++;
       rows.add(pw.TableRow(children: [
+        otd(a, '$i', ltr: true),
         _descCell(li.desc),
         otd(a, '${fmtQty(li.qty)}${mixedUnits ? ' ${li.unitLabel}' : ''}', ltr: !mixedUnits),
         otd(a, fmtSAR(li.unitPrice)),
@@ -165,6 +171,7 @@ class DocPdf {
     }
     if (inv.items.isEmpty) {
       rows.add(pw.TableRow(children: [
+        pw.SizedBox(),
         otd(a, 'لا توجد بنود', align: pw.Alignment.centerRight),
         pw.SizedBox(),
         pw.SizedBox(),
@@ -302,10 +309,11 @@ class DocPdf {
         pw.SizedBox(height: 8),
         officialTable(columnWidths: widths, children: rows),
         pw.SizedBox(height: 8),
-        // الإجماليات
+        // الإجماليات: التسميات قرب منتصف الصفحة والقيم عند الهامش الأيسر (كالمرجع)
         pw.Row(children: [
+          pw.Spacer(),
           pw.SizedBox(
-            width: 460,
+            width: 300,
             child: pw.Column(children: [
               _soaLine('إجمالي خدمات الضيافة', '${money(services)} ر.س'),
               if (hasExt) _soaLine('إجمالي المشتريات الخارجية', '${money(external)} ر.س'),
@@ -315,11 +323,15 @@ class DocPdf {
           ),
         ]),
         pw.SizedBox(height: 4),
-        singleRule(width: 1.2),
+        pw.Row(children: [
+          pw.Spacer(),
+          pw.SizedBox(width: 300, child: singleRule(width: 1.2)),
+        ]),
         pw.SizedBox(height: 8),
         pw.Row(children: [
+          pw.Spacer(),
           pw.SizedBox(
-            width: 460,
+            width: 300,
             child: pw.Row(children: [
               pw.Text('الإجمالي المستحق – ${_countLabel(s.count)}', style: a.t(13.2, color: O.brown, black: true)),
               pw.Spacer(),
@@ -327,9 +339,19 @@ class DocPdf {
             ]),
           ),
         ]),
+        // التفقيط داخل كتلة الإجماليات اليسرى (كالمرجع) ثم خط فاصل بعرض الصفحة قبل التذييل
         if (org.showTafqit && due > 0) pw.SizedBox(height: 4),
-        if (org.showTafqit && due > 0) pw.Text(tafqit(due), style: a.t(10.6, color: O.ink, bold: true)),
-        pw.SizedBox(height: 22),
+        if (org.showTafqit && due > 0)
+          pw.Row(children: [
+            pw.Spacer(),
+            pw.SizedBox(
+              width: 360,
+              child: pw.Text(tafqit(due), style: a.t(10.6, color: O.ink, bold: true), textAlign: pw.TextAlign.right),
+            ),
+          ]),
+        pw.SizedBox(height: 10),
+        singleRule(),
+        pw.SizedBox(height: 16),
         officialFooter(a, org, website: true),
       ],
     ));
@@ -346,7 +368,6 @@ class DocPdf {
   pw.Widget _soaLine(String label, String value) => pw.Padding(
         padding: const pw.EdgeInsets.only(bottom: 5),
         child: pw.Row(children: [
-          pw.SizedBox(width: 180),
           pw.Text(label, style: a.t(9.6, color: O.ink)),
           pw.Spacer(),
           pw.Text(value, style: a.t(9.6, color: O.ink)),
