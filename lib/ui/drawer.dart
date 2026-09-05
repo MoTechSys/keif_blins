@@ -5,8 +5,10 @@ library;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../core/file_service.dart';
 import '../core/store.dart';
 import 'screens/docs_screen.dart';
+import 'screens/files_screen.dart';
 import 'screens/payments_screen.dart';
 import 'screens/settings_screen.dart';
 import 'theme.dart';
@@ -54,6 +56,8 @@ class AppDrawer extends StatelessWidget {
                 Navigator.pop(context);
                 onNavigate(3);
               }),
+              if (FileService.supported)
+                DrawerItem(Ic.pdf, 'الملفات المحفوظة', 'ملفات PDF على الهاتف حسب النوع', onTap: () => open(const FilesScreen())),
               DrawerItem(Ic.share, 'النسخة الاحتياطية', store.lastAutoBackupAt == null ? 'لم تُحفظ نسخة بعد' : 'آخر نسخة: ${agoLabel(store.lastAutoBackupAt!)}', onTap: () => open(const BackupScreen())),
               Padding(padding: const EdgeInsets.symmetric(vertical: 8), child: Divider(color: C.line)),
               DrawerItem(Ic.gear, 'الإعدادات', 'المؤسسة، الفواتير، المظهر، الأمان، سلة المحذوفات', onTap: () => open(const SettingsHub())),
