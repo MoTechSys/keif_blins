@@ -408,7 +408,7 @@ class DocPdf {
     final badgeStatus = due > 0 ? 'مستحق: ${money(due)} ر.س' : (due < 0 ? 'دائن: ${money(-due)} ر.س' : 'لا مستحقات');
 
     // إجماليات حالة الفواتير للملخص
-    var cntPaid = 0, cntPartial = 0, cntUnpaid = 0, sumDeposits = 0, sumPays = 0;
+    var cntPaid = 0, cntPartial = 0, cntUnpaid = 0, sumDeposits = 0, sumPays = 0, sumBilled = 0;
 
     final body = <pw.Widget>[
       metaBlock(
@@ -456,8 +456,11 @@ class DocPdf {
       } else {
         cntUnpaid++;
       }
+      // الملخص يخص الفترة فقط: العربون بتاريخ الفاتورة (داخل الفترة حتمًا)، والدفعات داخل الفترة فقط
+      // كي تتطابق معادلة الملخص مع كشف الحساب المختصر؛ أما بطاقة الفاتورة فتعرض كل دفعاتها لتعكس حالتها الفعلية.
       sumDeposits += inv.deposit;
-      sumPays += extraPaid;
+      sumPays += invPays.where((p) => inRange(p.date)).fold<int>(0, (x, p) => x + p.amount);
+      sumBilled += t.total;
 
       final hasExt = inv.items.any((i) => i.external > 0);
       final hasDiscount = t.discount > 0;
@@ -736,6 +739,10 @@ class DocPdf {
     // ---- الملخص العام: حالة الفواتير (يمين) + معادلة الرصيد (يسار)
     final dueLabel = due > 0 ? 'الرصيد المستحق' : (due < 0 ? 'رصيد دائن للعميل' : 'الرصيد');
     final accTotal = onAccount.fold<int>(0, (x, p) => x + p.amount);
+    // تحقق داخلي: ما يُعرض في البطاقات يجب أن يساوي معادلة الكشف نفسها (تُفحص في الاختبارات)
+    assert(sumBilled == s.billed, 'إجمالي بطاقات الفواتير ($sumBilled) ≠ إجمالي الفواتير في الكشف (${s.billed})');
+    assert(sumDeposits + sumPays + accTotal == s.paid, 'مجموع المدفوعات المعروضة ≠ إجمالي المدفوعات في الكشف (${s.paid})');
+    assert(cntPaid + cntPartial + cntUnpaid == s.count, 'عدّادات الحالة لا تساوي عدد الفواتير');
     body.add(pw.SizedBox(height: 12));
     body.add(pw.Inseparable(
       child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [

@@ -105,7 +105,47 @@ void main() {
     // الكشف التفصيلي: بنود كل فاتورة ودفعاتها + دفعات على الحساب
     final det = await pdf.statementDetailed(s2, ps);
     expect(det.length, greaterThan(20000));
+    int pages(List<int> b) => RegExp(r'/Type\s*/Page[^s]').allMatches(String.fromCharCodes(b)).length;
+    expect(pages(det), greaterThanOrEqualTo(3), reason: '7 فواتير ببطاقات كاملة + ملخص ⇒ عدة صفحات');
     await save('statement_detailed.pdf', det);
+  });
+
+  test('detailed statement: consistency, edge cases and page splitting', () async {
+    final pdf = await DocPdf.create(org);
+    int pages(List<int> b) => RegExp(r'/Type\s*/Page[^s]').allMatches(String.fromCharCodes(b)).length;
+
+    // 1) دفعة على فاتورة داخل الفترة لكن بتاريخ بعد نهاية الفترة: تظهر في بطاقة الفاتورة (حالتها الفعلية)
+    //    لكن لا تُحسب في معادلة الملخص — التحقق الداخلي (assert) في المولّد يضمن تطابق الملخص مع buildStatement.
+    final a1 = Invoice(id: 'a1', number: 'INV-0101', clientId: 'c1', clientName: client.name, issueDate: '2026-07-10', status: 'sent', deposit: 20000,
+        items: [LineItem(desc: 'ضيافة', unitPrice: 100000, qty: 1)]);
+    final late = Payment(id: 'pl', clientId: 'c1', invoiceId: 'a1', amount: 80000, date: '2026-10-05', receiptNumber: 'REC-0101');
+    final s1 = buildStatement(client: client, invoices: [a1], payments: [late], from: '2026-07-01', to: '2026-09-30', number: 'SOA-T1');
+    expect(s1.paid, 20000, reason: 'العربون فقط داخل الفترة');
+    expect(s1.closing, 80000);
+    final b1 = await pdf.statementDetailed(s1, [late]);
+    expect(b1.length, greaterThan(10000));
+    expect(pages(b1), 1);
+
+    // 2) لا فواتير خلال الفترة: يُرسم الكشف مع عبارة «لا توجد فواتير» ولا يفشل
+    final s0 = buildStatement(client: client, invoices: [a1], payments: [], from: '2026-11-01', to: '2026-11-30', number: 'SOA-T0');
+    expect(s0.count, 0);
+    final b0 = await pdf.statementDetailed(s0, []);
+    expect(pages(b0), 1);
+
+    // 3) فاتورة طويلة جدًا (40 بندًا) يجب أن تنقسم عبر صفحات بلا استثناء «Widget won't fit» وأن يبقى الملخص متصلًا
+    final big = Invoice(id: 'b1', number: 'INV-0200', clientId: 'c1', clientName: client.name, issueDate: '2026-07-15', status: 'sent',
+        items: [for (var k = 1; k <= 40; k++) LineItem(desc: 'بند $k\n- تفصيل إضافي للبند', unitPrice: 1000 * k, qty: 1, external: k.isEven ? 500 : 0)]);
+    final sb = buildStatement(client: client, invoices: [big], payments: [], from: '2026-07-01', to: '2026-09-30', number: 'SOA-T2');
+    final bb = await pdf.statementDetailed(sb, []);
+    expect(pages(bb), greaterThanOrEqualTo(2));
+    await save('statement_detailed_long.pdf', bb);
+
+    // 4) فاتورة مدفوعة بالزيادة: المتبقي سالب ⇒ «مدفوع بالزيادة» ورصيد دائن، بلا أخطاء
+    final over = Payment(id: 'po', clientId: 'c1', invoiceId: 'a1', amount: 200000, date: '2026-07-11');
+    final so = buildStatement(client: client, invoices: [a1], payments: [over], from: '2026-07-01', to: '2026-09-30', number: 'SOA-T3');
+    expect(so.closing, lessThan(0));
+    final bo = await pdf.statementDetailed(so, [over]);
+    expect(pages(bo), 1);
   });
 
   test('receipt PDF renders', () async {
