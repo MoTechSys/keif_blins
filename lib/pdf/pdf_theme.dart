@@ -36,22 +36,30 @@ class PdfAssets {
   static PdfAssets? _i;
   final pw.Font regular, bold, black;
   final pw.MemoryImage logo, stamp;
+  /// شعارات الجهات (هيئة الزكاة، المركز السعودي للأعمال، وزارة التجارة) — شريط أسفل الفاتورة
+  final pw.MemoryImage certs;
+  /// زخرفة الأوراق المتجهية (شريط كشف الحساب)
+  final String leafSvg;
 
-  PdfAssets._(this.regular, this.bold, this.black, this.logo, this.stamp);
+  PdfAssets._(this.regular, this.bold, this.black, this.logo, this.stamp, this.certs, this.leafSvg);
 
   static Future<PdfAssets> load() async {
     if (_i != null) return _i!;
     final r = await rootBundle.load('assets/fonts/Tajawal-Regular.ttf');
     final b = await rootBundle.load('assets/fonts/Tajawal-Bold.ttf');
     final k = await rootBundle.load('assets/fonts/Tajawal-Black.ttf');
-    final logo = await rootBundle.load('assets/img/logo.png');
-    final stamp = await rootBundle.load('assets/img/stamp.png');
+    final logo = await rootBundle.load('assets/img/pdf/logo.png');
+    final stamp = await rootBundle.load('assets/img/pdf/stamp.png');
+    final certs = await rootBundle.load('assets/img/certs.png');
+    final leaf = await rootBundle.loadString('assets/img/leaf-tile.svg');
     _i = PdfAssets._(
       pw.Font.ttf(r),
       pw.Font.ttf(b),
       pw.Font.ttf(k),
       pw.MemoryImage(_u8(logo)),
       pw.MemoryImage(_u8(stamp)),
+      pw.MemoryImage(_u8(certs)),
+      leaf,
     );
     return _i!;
   }

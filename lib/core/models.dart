@@ -472,6 +472,8 @@ class Statement {
   final String to;
   final int opening; // الرصيد قبل الفترة (الافتتاحي + حركة ما قبل from)
   final List<StatementRow> rows;
+  /// الفواتير الواقعة داخل الفترة (للعرض التفصيلي في PDF الكشف) مرتبة بتاريخ الإصدار
+  final List<Invoice> invoices;
   final int billed, paid, closing, count;
   const Statement({
     required this.number,
@@ -482,6 +484,7 @@ class Statement {
     required this.to,
     required this.opening,
     required this.rows,
+    this.invoices = const [],
     required this.billed,
     required this.paid,
     required this.closing,
@@ -559,6 +562,11 @@ Statement buildStatement({
     to: to,
     opening: opening,
     rows: rows,
+    invoices: (inv.where((i) => inRange(i.issueDate)).toList()
+      ..sort((a, b) {
+        final c = a.issueDate.compareTo(b.issueDate);
+        return c != 0 ? c : a.number.compareTo(b.number);
+      })),
     billed: billed,
     paid: paid,
     closing: bal,

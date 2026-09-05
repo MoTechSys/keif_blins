@@ -8,6 +8,7 @@ import 'package:pdf/widgets.dart' as pw;
 
 import '../core/models.dart';
 import '../core/money.dart';
+import 'official_theme.dart';
 import 'pdf_theme.dart';
 
 class DocPdf {
@@ -25,97 +26,87 @@ class DocPdf {
       );
 
   /* ==========================================================
-     الفاتورة / عرض السعر
+     الفاتورة / عرض السعر — التصميم الرسمي البسيط
      ========================================================== */
   Future<Uint8List> invoice(Invoice inv, List<Payment> payments, {Client? client}) async {
     final isQ = inv.isQuote;
     final t = inv.totals;
-    final paid = isQ ? 0 : invoicePaid(inv, payments);
+    // المدفوع = العربون + الدفعات المسجَّلة على الفاتورة
+    final extraPaid = isQ ? 0 : payments.where((p) => p.invoiceId == inv.id).fold<int>(0, (s, p) => s + p.amount);
+    final deposit = isQ ? 0 : inv.deposit;
+    final paid = deposit + extraPaid;
     final remaining = t.total - paid;
-    final titleAr = isQ ? 'عرض سعر' : (inv.vatRateBp > 0 ? 'فاتورة ضريبية' : 'فاتورة');
-    final titleEn = isQ ? 'QUOTATION' : (inv.vatRateBp > 0 ? 'TAX INVOICE' : 'INVOICE');
+    final titleAr = isQ ? 'عرض سعر' : 'فاتورة';
     final label = isQ ? 'عرض سعر رقم ${inv.number}' : 'فاتورة رقم ${inv.number}';
-
-    String? badge;
-    PdfColor badgeColor = K.navy;
-    if (!isQ) {
-      final st = computeStatus(inv, payments);
-      badge = statusLabel[st];
-      badgeColor = switch (st) {
-        InvoiceStatus.paid => K.green,
-        InvoiceStatus.partial => K.goldDark,
-        InvoiceStatus.cancelled => K.red,
-        _ => K.navy,
-      };
-    } else {
-      badge = quoteStatusLabel[inv.quoteStatus];
-    }
+    final hasExt = inv.items.any((i) => i.external > 0);
+    final hasDiscount = t.discount > 0;
+    final hasVat = t.vatRateBp > 0 && t.vat > 0;
+    final showSubtotal = hasDiscount || hasVat;
+    final vatPct = t.vatRateBp % 100 == 0 ? '${t.vatRateBp ~/ 100}' : (t.vatRateBp / 100).toStringAsFixed(1);
 
     final doc = _doc(label);
     doc.addPage(pw.MultiPage(
-      pageTheme: royalPageTheme(a, org),
-      header: (ctx) => pw.Column(children: [
-        royalHeader(a, org),
-        pw.SizedBox(height: 3 * mm),
-        titleBand(a, titleAr, titleEn, badge: badge, badgeColor: badgeColor),
-        pw.SizedBox(height: 3 * mm),
-      ]),
+      pageTheme: officialPageTheme(a, org),
+      header: (ctx) => pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 14),
+        child: officialHeader(a, org, badgeLines: [titleAr]),
+      ),
       footer: (ctx) => pw.Column(children: [
-        royalFooter(a, org, bank: !isQ || true),
-        pageNum(a, ctx, '$label — ${org.name}'),
+        pw.SizedBox(height: 8),
+        singleRule(width: 0.6),
+        pw.SizedBox(height: 10),
+        officialFooter(a, org),
+        pw.SizedBox(height: 18),
+        pw.Center(child: pw.Image(a.certs, height: 26)),
+        pw.SizedBox(height: 14),
+        officialPageNum(a, ctx),
       ]),
       build: (ctx) => [
-        // بطاقتا البيانات
-        pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-          pw.Expanded(
-            flex: 11,
-            child: dataCard(a, title: isQ ? 'مقدَّم إلى' : 'بيانات العميل', rows: [
-              ('العميل', inv.clientName),
-              ('جهة الاتصال', client?.contact ?? ''),
-              ('الهاتف', client?.phone ?? ''),
-              ('الرقم الضريبي', client?.vatNumber ?? ''),
-              ('العنوان', client?.address ?? ''),
+        // بيانات العميل (يمين) / بيانات الفاتورة (يسار)
+        metaBlock(
+          a,
+          right: [
+            (isQ ? 'مقدَّم إلى: الاسم' : 'بيانات العميل: الاسم', inv.clientName, false),
+            if (org.showEventBlock) ('تاريخ الفعالية', _eventRange(inv), true),
+            if (org.showEventBlock) ('موقع الفعالية', inv.location, false),
+          ],
+          left: [
+            (isQ ? 'رقم العرض' : 'رقم الفاتورة', inv.number, true),
+            ('التاريخ', fmtDate(inv.issueDate), true),
+            if (isQ) ('ساري حتى', fmtDate(inv.validUntil), true),
+            if (org.showEventBlock) ('عدد الحضور التقريبي', inv.attendees, true),
+          ],
+        ),
+        pw.SizedBox(height: 14),
+        _itemsTable(inv, hasExt),
+        pw.SizedBox(height: 12),
+        // كتلة الإجماليات يسار
+        pw.Row(children: [
+          pw.SizedBox(
+            width: 255,
+            child: pw.Column(children: [
+              singleRule(width: 1.2),
+              pw.SizedBox(height: 8),
+              if (hasExt) _sumLine('خدمات الضيافة', fmtSAR(t.services)),
+              if (hasExt) _sumLine('مشتريات خارجية', fmtSAR(t.external)),
+              if (showSubtotal) _sumLine('المجموع', fmtSAR(t.subtotal)),
+              if (hasDiscount) _sumLine('الخصم', '- ${fmtSAR(t.discount)}'),
+              if (hasVat) _sumLine('ضريبة القيمة المضافة ($vatPct%)', fmtSAR(t.vat)),
+              _sumLine(isQ ? 'الإجمالي' : 'الصافي', fmtSAR(t.total), size: 12.6, black: true),
+              if (!isQ && org.showRemaining && deposit > 0) _sumLine('العربون المدفوع', fmtSAR(deposit)),
+              if (!isQ && org.showRemaining && extraPaid > 0) _sumLine('المدفوع', fmtSAR(extraPaid)),
+              if (!isQ && org.showRemaining && paid > 0)
+                _sumLine('المتبقي', fmtSAR(remaining), color: remaining > 0 ? O.red : O.brown, bold: true),
             ]),
           ),
-          pw.SizedBox(width: 3 * mm),
-          pw.Expanded(
-            flex: 9,
-            child: dataCard(a, title: isQ ? 'بيانات العرض' : 'بيانات الفاتورة', rows: [
-              (isQ ? 'رقم العرض' : 'رقم الفاتورة', inv.number),
-              ('تاريخ الإصدار', fmtDate(inv.issueDate)),
-              if (isQ) ('ساري حتى', fmtDate(inv.validUntil)),
-              if (org.showEventBlock) ('تاريخ المناسبة', _eventRange(inv)),
-              if (org.showEventBlock) ('الموقع', inv.location),
-              if (org.showEventBlock) ('عدد الحضور', inv.attendees),
-            ]),
-          ),
+          pw.Spacer(),
         ]),
-        pw.SizedBox(height: 3.5 * mm),
-        // جدول البنود
-        _itemsTable(inv, t),
-        pw.SizedBox(height: 3 * mm),
-        // الملخّص + التفقيط
-        pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-          pw.Expanded(
-            flex: 11,
-            child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              if (org.showTafqit) _tafqitBox(t.total),
-              if (org.showTafqit) pw.SizedBox(height: 2.5 * mm),
-              if (org.showTerms && (inv.terms.isNotEmpty ? inv.terms : (isQ ? org.quoteTerms : org.invoiceTerms)).isNotEmpty)
-                _termsBox(isQ ? 'الشروط والأحكام' : 'ملاحظات وشروط',
-                    inv.terms.isNotEmpty ? inv.terms : (isQ ? org.quoteTerms : org.invoiceTerms)),
-              if (inv.notes.isNotEmpty) pw.SizedBox(height: 2 * mm),
-              if (inv.notes.isNotEmpty) _termsBox('ملاحظات', inv.notes),
-            ]),
-          ),
-          pw.SizedBox(width: 3 * mm),
-          pw.Expanded(flex: 9, child: _sumsCard(t, paid, remaining, isQ)),
-        ]),
-        pw.SizedBox(height: 4 * mm),
-        if (!isQ && org.showAck) _ackBlock(),
-        if (!isQ && org.showAck) pw.SizedBox(height: 3 * mm),
-        if (org.showSignatures) signatures(a, org, left: isQ ? 'اعتماد العميل' : 'توقيع العميل'),
-        pw.SizedBox(height: 2 * mm),
+        if (inv.notes.trim().isNotEmpty) pw.SizedBox(height: 10),
+        if (inv.notes.trim().isNotEmpty)
+          pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+            pw.Text('ملاحظات: ', style: a.t(10.2, color: O.brown, bold: true)),
+            pw.Expanded(child: pw.Text(inv.notes.trim(), style: a.t(10.2, color: O.ink))),
+          ]),
       ],
     ));
     return doc.save();
@@ -124,347 +115,243 @@ class DocPdf {
   String _eventRange(Invoice inv) {
     if (inv.eventDate.isEmpty) return '';
     if (inv.eventDateTo.isNotEmpty && inv.eventDateTo != inv.eventDate) {
-      return 'من ${fmtDate(inv.eventDate)} إلى ${fmtDate(inv.eventDateTo)}';
+      return '${fmtDate(inv.eventDate)} - ${fmtDate(inv.eventDateTo)}';
     }
     return fmtDate(inv.eventDate);
   }
 
-  pw.Widget _itemsTable(Invoice inv, Totals t) {
-    final hasExt = t.external > 0;
-    final unit = inv.items.isNotEmpty && inv.items.every((i) => i.unitLabel == inv.items.first.unitLabel)
-        ? inv.items.first.unitLabel
-        : 'الكمية';
+  /// عنوان عمود الكمية حسب وحدة البنود (عدد الأيام / عدد الفترات / الكمية…)
+  String _qtyHeader(Invoice inv) {
+    if (inv.items.isEmpty) return 'الكمية';
+    final u = inv.items.first.unitLabel;
+    if (!inv.items.every((i) => i.unitLabel == u)) return 'الكمية';
+    return switch (u) {
+      'يوم' => 'عدد الأيام',
+      'فترة' => 'عدد الفترات',
+      'ساعة' => 'عدد الساعات',
+      'شخص' => 'عدد الأشخاص',
+      'وجبة' => 'عدد الوجبات',
+      _ => 'الكمية',
+    };
+  }
+
+  pw.Widget _itemsTable(Invoice inv, bool hasExt) {
+    final qtyHead = _qtyHeader(inv);
+    final mixedUnits = qtyHead == 'الكمية';
     final widths = <int, pw.TableColumnWidth>{
-      0: const pw.FixedColumnWidth(8 * mm),
-      1: const pw.FlexColumnWidth(),
-      2: const pw.FixedColumnWidth(24 * mm),
-      3: const pw.FixedColumnWidth(16 * mm),
-      if (hasExt) 4: const pw.FixedColumnWidth(26 * mm),
-      (hasExt ? 5 : 4): const pw.FixedColumnWidth(28 * mm),
+      0: const pw.FlexColumnWidth(),
+      1: const pw.FixedColumnWidth(69),
+      2: const pw.FixedColumnWidth(79),
+      if (hasExt) 3: const pw.FixedColumnWidth(72),
+      (hasExt ? 4 : 3): const pw.FixedColumnWidth(78),
     };
     final rows = <pw.TableRow>[
-      pw.TableRow(repeat: true, decoration: tableHeadDeco(), children: [
-        th(a, 'م'),
-        th(a, 'وصف الخدمة', align: pw.Alignment.centerRight),
-        th(a, 'السعر'),
-        th(a, unit),
-        if (hasExt) th(a, 'مشتريات خارجية'),
-        th(a, 'الإجمالي (ر.س)'),
+      pw.TableRow(repeat: true, decoration: headDeco(), children: [
+        oth(a, 'الوصف'),
+        oth(a, qtyHead),
+        oth(a, 'السعر'),
+        if (hasExt) oth(a, 'مشتريات خارجية'),
+        oth(a, 'الإجمالي'),
       ]),
     ];
-    var n = 0;
     for (final li in inv.items) {
-      n++;
-      final even = n.isEven;
-      rows.add(pw.TableRow(
-        decoration: pw.BoxDecoration(
-          color: even ? K.beigeSoft : K.white,
-          border: const pw.Border(bottom: pw.BorderSide(color: K.line, width: 0.3)),
-        ),
-        verticalAlignment: pw.TableCellVerticalAlignment.middle,
-        children: [
-          pw.Padding(padding: const pw.EdgeInsets.symmetric(vertical: 1.5 * mm), child: pw.Center(child: numCircle(a, n))),
-          _descCell(li.desc),
-          td(a, fmt(li.unitPrice, trimZeros: true), ltr: true),
-          td(a, '${fmtQty(li.qty)}${unit == 'الكمية' ? ' ${li.unitLabel}' : ''}'),
-          if (hasExt) td(a, li.external > 0 ? fmt(li.external, trimZeros: true) : '—', color: li.external > 0 ? K.ink : K.muted, ltr: li.external > 0),
-          td(a, fmt(li.total), bold: true, color: K.navy, ltr: true),
-        ],
-      ));
+      rows.add(pw.TableRow(children: [
+        _descCell(li.desc),
+        otd(a, '${fmtQty(li.qty)}${mixedUnits ? ' ${li.unitLabel}' : ''}', ltr: !mixedUnits),
+        otd(a, fmtSAR(li.unitPrice)),
+        if (hasExt) otd(a, li.external > 0 ? fmtSAR(li.external) : '—'),
+        otd(a, fmtSAR(li.total)),
+      ]));
     }
     if (inv.items.isEmpty) {
       rows.add(pw.TableRow(children: [
-        pw.SizedBox(),
-        td(a, 'لا توجد بنود', color: K.muted, align: pw.Alignment.centerRight),
+        otd(a, 'لا توجد بنود', align: pw.Alignment.centerRight),
         pw.SizedBox(),
         pw.SizedBox(),
         if (hasExt) pw.SizedBox(),
         pw.SizedBox(),
       ]));
     }
-    return pw.Container(
-      decoration: pw.BoxDecoration(
-        border: pw.Border.all(color: K.gold, width: 0.5),
-        borderRadius: pw.BorderRadius.circular(1.5 * mm),
-      ),
-      child: pw.ClipRRect(
-        horizontalRadius: 1.5 * mm,
-        verticalRadius: 1.5 * mm,
-        child: rtlTable(columnWidths: widths, children: rows),
-      ),
-    );
+    return officialTable(columnWidths: widths, children: rows);
   }
 
-  /// خلية الوصف: السطر الأول عنوان، والأسطر التالية فرعية بمعيّن ذهبي
+  /// خلية الوصف: السطر الأول عريض، والأسطر التالية عادية مسبوقة بشرطة.
   pw.Widget _descCell(String desc) {
     final lines = desc.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-    if (lines.isEmpty) return td(a, '', align: pw.Alignment.centerRight);
+    if (lines.isEmpty) return otd(a, '', align: pw.Alignment.centerRight);
     return pw.Container(
       alignment: pw.Alignment.centerRight,
-      padding: const pw.EdgeInsets.symmetric(horizontal: 2 * mm, vertical: 1.6 * mm),
+      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 9),
       child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-        pw.Text(lines.first, style: a.t(8.6, color: K.ink, bold: true)),
+        pw.Text(lines.first, style: a.t(10.8, color: O.ink, bold: true)),
         for (final l in lines.skip(1))
           pw.Padding(
-            padding: const pw.EdgeInsets.only(top: 0.4 * mm, right: 1.5 * mm),
-            child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              goldDiamond(1.4 * mm),
-              pw.SizedBox(width: 1.2 * mm),
-              pw.Expanded(child: pw.Text(l, style: a.t(7.4, color: K.muted))),
-            ]),
+            padding: const pw.EdgeInsets.only(top: 3),
+            child: pw.Text(l.startsWith('-') ? l : '- $l', style: a.t(10.2, color: O.ink)),
           ),
       ]),
     );
   }
 
-  pw.Widget _sumRow(String l, String v, {bool strong = false, PdfColor? color, bool last = false}) => pw.Container(
-        padding: const pw.EdgeInsets.symmetric(vertical: 1.3 * mm, horizontal: 3 * mm),
-        decoration: last
-            ? null
-            : const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: K.line, width: 0.3, style: pw.BorderStyle.dashed))),
+  /// سطر إجمالي: التسمية يمين والقيمة يسار (LTR للأرقام)
+  pw.Widget _sumLine(String label, String value, {double size = 10.8, bool bold = false, bool black = false, PdfColor color = O.ink}) =>
+      pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 6),
         child: pw.Row(children: [
-          pw.Text(l, style: a.t(strong ? 8.8 : 8, color: color ?? (strong ? K.navy : K.muted), bold: strong)),
+          pw.Text(label, style: a.t(size, color: color, bold: bold, black: black)),
           pw.Spacer(),
-          pw.Text(v, style: a.t(strong ? 9.5 : 8.4, color: color ?? K.ink, bold: true), textDirection: pw.TextDirection.ltr),
-        ]),
-      );
-
-  pw.Widget _sumsCard(Totals t, int paid, int remaining, bool isQ) {
-    final vatPct = t.vatRateBp % 100 == 0 ? '${t.vatRateBp ~/ 100}' : (t.vatRateBp / 100).toStringAsFixed(1);
-    return pw.Container(
-      decoration: pw.BoxDecoration(
-        color: K.beigeSoft,
-        border: pw.Border.all(color: K.gold, width: 0.5),
-        borderRadius: pw.BorderRadius.circular(2 * mm),
-      ),
-      child: pw.ClipRRect(
-        horizontalRadius: 2 * mm,
-        verticalRadius: 2 * mm,
-        child: pw.Column(children: [
-          if (t.external > 0) _sumRow('الخدمات', fmt(t.services)),
-          if (t.external > 0) _sumRow('المشتريات الخارجية', fmt(t.external)),
-          _sumRow('المجموع', fmt(t.subtotal)),
-          if (t.discount > 0) _sumRow('الخصم', '- ${fmt(t.discount)}', color: K.red),
-          if (t.vatRateBp > 0) _sumRow('ضريبة القيمة المضافة ($vatPct%)', fmt(t.vat)),
-          // الإجمالي — شريط كحلي
-          pw.Container(
-            padding: const pw.EdgeInsets.symmetric(vertical: 2.2 * mm, horizontal: 3 * mm),
-            decoration: pw.BoxDecoration(gradient: const pw.LinearGradient(colors: [K.navyDeep, K.navy, K.navyLight])),
-            child: pw.Row(children: [
-              pw.Text(isQ ? 'إجمالي العرض' : 'الإجمالي المستحق', style: a.t(9.5, color: K.goldLight, bold: true)),
-              pw.Spacer(),
-              pw.Text(fmtSAR(t.total), style: a.t(12, color: K.white, black: true), textDirection: pw.TextDirection.ltr),
-            ]),
-          ),
-          if (!isQ && paid > 0 && org.showRemaining) _sumRow('العربون / المدفوع', fmt(paid), color: K.green),
-          if (!isQ && paid > 0 && org.showRemaining) _sumRow('المتبقي', fmtSAR(remaining), strong: true, color: remaining > 0 ? K.red : K.green, last: true),
-        ]),
-      ),
-    );
-  }
-
-  pw.Widget _tafqitBox(int total) => pw.Container(
-        padding: const pw.EdgeInsets.symmetric(horizontal: 3 * mm, vertical: 2 * mm),
-        decoration: pw.BoxDecoration(
-          border: pw.Border.all(color: K.gold, width: 0.4),
-          borderRadius: pw.BorderRadius.circular(1.5 * mm),
-          color: K.white,
-        ),
-        child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-          pw.Container(width: 1.2 * mm, height: 5 * mm, color: K.gold),
-          pw.SizedBox(width: 2 * mm),
-          pw.Expanded(
-            child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              pw.Text('المبلغ كتابةً', style: a.t(6.8, color: K.muted)),
-              pw.Text(tafqit(total), style: a.t(8.4, color: K.navy, bold: true)),
-            ]),
-          ),
-        ]),
-      );
-
-  pw.Widget _termsBox(String title, String body) => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-        pw.Text(title, style: a.t(7.8, color: K.goldDark, bold: true)),
-        pw.SizedBox(height: 0.6 * mm),
-        pw.Text(body, style: a.t(7.4, color: K.muted)),
-      ]);
-
-  pw.Widget _ackBlock() => pw.Container(
-        padding: const pw.EdgeInsets.symmetric(horizontal: 4 * mm, vertical: 2 * mm),
-        decoration: pw.BoxDecoration(
-          gradient: const pw.LinearGradient(colors: [K.navyDeep, K.navy]),
-          borderRadius: pw.BorderRadius.circular(1.5 * mm),
-        ),
-        child: pw.Row(children: [
-          pw.Text('إقرار  ', style: a.t(8, color: K.goldLight, bold: true)),
-          pw.Expanded(
-            child: pw.Text(
-              'أُقرّ بأنني استلمت الخدمات الموضحة أعلاه بحالة جيدة ومطابقة للاتفاق، وأن المبالغ المذكورة صحيحة.',
-              style: a.t(7.6, color: K.white),
-            ),
-          ),
+          pw.Text(value, style: a.t(size, color: color, bold: bold, black: black)),
         ]),
       );
 
   /* ==========================================================
-     كشف الحساب — متعدد الصفحات
+     كشف الحساب — تفصيلي بفواتير الفترة (متعدد الصفحات)
      ========================================================== */
   Future<Uint8List> statement(Statement s) async {
     final label = 'كشف حساب ${s.number}';
-    final period = s.from.isEmpty && s.to.isEmpty
+    final invs = s.invoices;
+    // عنوان الفترة: شهر واحد → «أغسطس 2026»، غير ذلك → المدى
+    final monthRef = s.to.isNotEmpty ? s.to : (s.from.isNotEmpty ? s.from : s.issueDate);
+    final sameMonth = s.from.length >= 7 && s.to.length >= 7 && s.from.substring(0, 7) == s.to.substring(0, 7);
+    final periodTitle = sameMonth ? fmtMonth(monthRef) : (s.from.isEmpty && s.to.isEmpty ? 'كل الفترات' : fmtMonth(monthRef));
+    final periodText = s.from.isEmpty && s.to.isEmpty
         ? 'كل الفترات'
-        : 'من ${s.from.isEmpty ? 'البداية' : fmtDate(s.from)} إلى ${s.to.isEmpty ? 'اليوم' : fmtDate(s.to)}';
+        : '${sameMonth ? '$periodTitle — ' : ''}من ${s.from.isEmpty ? 'البداية' : fmtDate(s.from)} حتى ${s.to.isEmpty ? fmtDate(s.issueDate) : fmtDate(s.to)}';
+    final services = invs.fold<int>(0, (v, i) => v + i.totals.services);
+    final external = invs.fold<int>(0, (v, i) => v + i.totals.external);
+    final hasExt = external > 0;
+    final due = s.closing;
     final doc = _doc(label);
 
+    String money(int h) => fmt(h, trimZeros: true);
+
+    final widths = <int, pw.TableColumnWidth>{
+      0: const pw.FixedColumnWidth(20), // م
+      1: const pw.FixedColumnWidth(47), // رقم الفاتورة
+      2: const pw.FixedColumnWidth(51), // تاريخ الإصدار
+      3: const pw.FixedColumnWidth(53), // تاريخ الفعالية
+      4: const pw.FixedColumnWidth(57), // الموقع
+      5: const pw.FlexColumnWidth(), // البيان
+      6: const pw.FixedColumnWidth(38), // الفترات
+      7: const pw.FixedColumnWidth(43), // السعر
+      if (hasExt) 8: const pw.FixedColumnWidth(52), // مشتريات خارجية
+      (hasExt ? 9 : 8): const pw.FixedColumnWidth(58), // الإجمالي
+    };
     final rows = <pw.TableRow>[
-      pw.TableRow(repeat: true, decoration: tableHeadDeco(), children: [
-        th(a, 'التاريخ'),
-        th(a, 'المرجع'),
-        th(a, 'البيان', align: pw.Alignment.centerRight),
-        th(a, 'مدين (فواتير)'),
-        th(a, 'دائن (دفعات)'),
-        th(a, 'الرصيد'),
-      ]),
-      pw.TableRow(decoration: const pw.BoxDecoration(color: K.beige), children: [
-        td(a, ''),
-        td(a, ''),
-        td(a, 'رصيد افتتاحي', align: pw.Alignment.centerRight, bold: true, color: K.navy),
-        td(a, ''),
-        td(a, ''),
-        td(a, fmt(s.opening), bold: true, color: K.navy, ltr: true),
+      pw.TableRow(repeat: true, decoration: headDeco(), children: [
+        oth(a, 'م', size: 8.6),
+        oth(a, 'رقم\nالفاتورة', size: 8.6),
+        oth(a, 'تاريخ\nالإصدار', size: 8.6),
+        oth(a, 'تاريخ\nالفعالية', size: 8.6),
+        oth(a, 'الموقع', size: 8.6),
+        oth(a, 'البيان', size: 8.6),
+        oth(a, 'الفترات', size: 8.6),
+        oth(a, 'السعر', size: 8.6),
+        if (hasExt) oth(a, 'مشتريات\nخارجية', size: 8.6),
+        oth(a, 'الإجمالي\n(ر.س)', size: 8.6),
       ]),
     ];
-    var i = 0;
-    for (final r in s.rows) {
-      i++;
-      final isInv = r.type == 'invoice';
-      rows.add(pw.TableRow(
-        decoration: pw.BoxDecoration(
-          color: i.isEven ? K.beigeSoft : K.white,
-          border: const pw.Border(bottom: pw.BorderSide(color: K.line, width: 0.3)),
-        ),
-        children: [
-          td(a, fmtDate(r.date), size: 7.6, ltr: true),
-          td(a, r.ref, size: 7.4, color: K.muted, ltr: true),
-          td(a, r.desc, align: pw.Alignment.centerRight, size: 7.8),
-          td(a, isInv ? fmt(r.debit) : '', color: K.ink, ltr: true),
-          td(a, !isInv ? fmt(r.credit) : '', color: K.green, ltr: true),
-          td(a, fmt(r.balance), bold: true, color: r.balance > 0 ? K.navy : K.green, ltr: true),
-        ],
-      ));
-    }
-    if (s.rows.isEmpty) {
+    var n = 0;
+    for (final i in invs) {
+      n++;
+      final qty = i.items.fold<double>(0, (v, li) => v + li.qty);
+      final price = i.items.length == 1 ? i.items.first.unitPrice : (qty > 0 ? (i.totals.services / qty).round() : i.totals.services);
+      final desc = i.items.map((li) => li.desc.split('\n').first.trim()).where((e) => e.isNotEmpty).join('، ');
       rows.add(pw.TableRow(children: [
-        pw.SizedBox(),
-        pw.SizedBox(),
-        td(a, 'لا توجد حركات خلال الفترة', align: pw.Alignment.centerRight, color: K.muted),
-        pw.SizedBox(),
-        pw.SizedBox(),
-        pw.SizedBox(),
+        otd(a, '$n', size: 8.4, vPad: 7),
+        otd(a, i.number, size: 8.4, ltr: true, vPad: 7),
+        otd(a, fmtDate(i.issueDate), size: 8.4, ltr: true, vPad: 7),
+        otd(a, i.eventDate.isEmpty ? '—' : fmtDate(i.eventDate), size: 8.4, ltr: i.eventDate.isNotEmpty, vPad: 7),
+        otd(a, i.location.isEmpty ? '—' : i.location, size: 8.4, vPad: 7),
+        otd(a, desc.isEmpty ? 'خدمات ضيافة' : 'خدمات ضيافة: $desc', size: 8.4, vPad: 7),
+        otd(a, fmtQty(qty), size: 8.4, ltr: true, vPad: 7),
+        otd(a, money(price), size: 8.4, ltr: true, vPad: 7),
+        if (hasExt) otd(a, i.totals.external > 0 ? money(i.totals.external) : '—', size: 8.4, ltr: i.totals.external > 0, vPad: 7),
+        otd(a, money(i.totals.total), size: 8.4, ltr: true, bold: true, vPad: 7),
+      ]));
+    }
+    if (invs.isEmpty) {
+      rows.add(pw.TableRow(children: [
+        for (var k = 0; k < (hasExt ? 10 : 9); k++) k == 5 ? otd(a, 'لا توجد فواتير خلال الفترة', size: 8.6) : pw.SizedBox(),
       ]));
     }
 
     doc.addPage(pw.MultiPage(
-      pageTheme: royalPageTheme(a, org),
-      header: (ctx) => pw.Column(children: [
-        royalHeader(a, org),
-        pw.SizedBox(height: 3 * mm),
-        titleBand(a, s.title, 'STATEMENT OF ACCOUNT', badge: s.closing > 0 ? 'مستحق: ${fmtSARSmart(s.closing)}' : 'لا مستحقات', badgeColor: s.closing > 0 ? K.red : K.green),
-        pw.SizedBox(height: 3 * mm),
-        if (ctx.pageNumber > 1)
-          pw.Padding(
-            padding: const pw.EdgeInsets.only(bottom: 2 * mm),
-            child: pw.Text('${s.client.name}  —  $period  (تابع)', style: a.t(8, color: K.muted)),
-          ),
-      ]),
-      footer: (ctx) => pw.Column(children: [
-        royalFooter(a, org),
-        pageNum(a, ctx, '$label — ${s.client.name}'),
-      ]),
+      pageTheme: officialPageTheme(a, org, leaves: true),
+      header: (ctx) => pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 10),
+        child: officialHeader(a, org, badgeLines: ['كشف حساب', periodTitle]),
+      ),
+      footer: (ctx) => pw.Padding(
+        padding: const pw.EdgeInsets.only(top: 8),
+        child: officialPageNum(a, ctx, prefix: periodTitle),
+      ),
       build: (ctx) => [
-        pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-          pw.Expanded(
-            flex: 11,
-            child: dataCard(a, title: 'بيانات العميل', rows: [
-              ('العميل', s.client.name),
-              ('جهة الاتصال', s.client.contact),
-              ('الهاتف', s.client.phone),
-              ('الرقم الضريبي', s.client.vatNumber),
-            ]),
-          ),
-          pw.SizedBox(width: 3 * mm),
-          pw.Expanded(
-            flex: 9,
-            child: dataCard(a, title: 'بيانات الكشف', rows: [
-              ('رقم الكشف', s.number),
-              ('تاريخ الإصدار', fmtDate(s.issueDate)),
-              ('الفترة', period),
-              ('عدد الفواتير', '${s.count}'),
-            ]),
-          ),
-        ]),
-        pw.SizedBox(height: 3.5 * mm),
-        pw.Container(
-          decoration: pw.BoxDecoration(border: pw.Border.all(color: K.gold, width: 0.5), borderRadius: pw.BorderRadius.circular(1.5 * mm)),
-          child: pw.ClipRRect(
-            horizontalRadius: 1.5 * mm,
-            verticalRadius: 1.5 * mm,
-            child: rtlTable(
-              columnWidths: const {
-                0: pw.FixedColumnWidth(19 * mm),
-                1: pw.FixedColumnWidth(20 * mm),
-                2: pw.FlexColumnWidth(),
-                3: pw.FixedColumnWidth(24 * mm),
-                4: pw.FixedColumnWidth(24 * mm),
-                5: pw.FixedColumnWidth(25 * mm),
-              },
-              children: rows,
-            ),
-          ),
+        metaBlock(
+          a,
+          size: 9,
+          right: [
+            ('كشف حساب مُقدَّم إلى', s.client.name, false),
+            ('الفترة', periodText, false),
+          ],
+          left: [
+            ('رقم الكشف', s.number, true),
+            ('تاريخ الإصدار', fmtDate(s.issueDate), true),
+          ],
         ),
-        pw.SizedBox(height: 3.5 * mm),
-        pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-          pw.Expanded(
-            flex: 11,
-            child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              if (org.showTafqit) _tafqitBox(s.closing.abs()),
-              if (org.showTafqit) pw.SizedBox(height: 2 * mm),
-              if (org.showTerms) _termsBox('ملاحظة', s.closing > 0
-                  ? 'نأمل تسوية الرصيد المستحق عبر التحويل البنكي على الحساب المذكور أدناه مع ذكر رقم الكشف. للاستفسار عن أي حركة يرجى التواصل معنا.'
-                  : 'حسابكم مسدَّد بالكامل حتى تاريخ هذا الكشف. نشكر لكم حسن تعاونكم.'),
+        pw.SizedBox(height: 8),
+        officialTable(columnWidths: widths, children: rows),
+        pw.SizedBox(height: 8),
+        // الإجماليات
+        pw.Row(children: [
+          pw.SizedBox(
+            width: 460,
+            child: pw.Column(children: [
+              _soaLine('إجمالي خدمات الضيافة', '${money(services)} ر.س'),
+              if (hasExt) _soaLine('إجمالي المشتريات الخارجية', '${money(external)} ر.س'),
+              if (s.opening != 0) _soaLine('رصيد سابق قبل الفترة', '${money(s.opening)} ر.س'),
+              if (s.paid > 0) _soaLine('المدفوع خلال الفترة', '${money(s.paid)} ر.س'),
             ]),
           ),
-          pw.SizedBox(width: 3 * mm),
-          pw.Expanded(
-            flex: 9,
-            child: pw.Container(
-              decoration: pw.BoxDecoration(color: K.beigeSoft, border: pw.Border.all(color: K.gold, width: 0.5), borderRadius: pw.BorderRadius.circular(2 * mm)),
-              child: pw.ClipRRect(
-                horizontalRadius: 2 * mm,
-                verticalRadius: 2 * mm,
-                child: pw.Column(children: [
-                  _sumRow('الرصيد الافتتاحي', fmt(s.opening)),
-                  _sumRow('إجمالي الفواتير', fmt(s.billed)),
-                  _sumRow('إجمالي المدفوعات', fmt(s.paid), color: K.green),
-                  pw.Container(
-                    padding: const pw.EdgeInsets.symmetric(vertical: 2.2 * mm, horizontal: 3 * mm),
-                    decoration: pw.BoxDecoration(gradient: const pw.LinearGradient(colors: [K.navyDeep, K.navy, K.navyLight])),
-                    child: pw.Row(children: [
-                      pw.Text(s.closing >= 0 ? 'الرصيد المستحق' : 'رصيد دائن للعميل', style: a.t(9.5, color: K.goldLight, bold: true)),
-                      pw.Spacer(),
-                      pw.Text(fmtSAR(s.closing.abs()), style: a.t(12, color: K.white, black: true), textDirection: pw.TextDirection.ltr),
-                    ]),
-                  ),
-                ]),
-              ),
-            ),
+        ]),
+        pw.SizedBox(height: 4),
+        singleRule(width: 1.2),
+        pw.SizedBox(height: 8),
+        pw.Row(children: [
+          pw.SizedBox(
+            width: 460,
+            child: pw.Row(children: [
+              pw.Text('الإجمالي المستحق – ${_countLabel(s.count)}', style: a.t(13.2, color: O.brown, black: true)),
+              pw.Spacer(),
+              pw.Text('${money(due)} ر.س', style: a.t(13.2, color: O.brown, black: true)),
+            ]),
           ),
         ]),
-        pw.SizedBox(height: 4 * mm),
-        if (org.showSignatures) signatures(a, org, right: 'المحاسب / المدير العام', left: 'مصادقة العميل'),
+        if (org.showTafqit && due > 0) pw.SizedBox(height: 4),
+        if (org.showTafqit && due > 0) pw.Text(tafqit(due), style: a.t(10.6, color: O.ink, bold: true)),
+        pw.SizedBox(height: 22),
+        officialFooter(a, org, website: true),
       ],
     ));
     return doc.save();
   }
+
+  String _countLabel(int n) => switch (n) {
+        1 => 'فاتورة واحدة',
+        2 => 'فاتورتان',
+        _ when n >= 3 && n <= 10 => '$n فواتير',
+        _ => '$n فاتورة',
+      };
+
+  pw.Widget _soaLine(String label, String value) => pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 5),
+        child: pw.Row(children: [
+          pw.SizedBox(width: 180),
+          pw.Text(label, style: a.t(9.6, color: O.ink)),
+          pw.Spacer(),
+          pw.Text(value, style: a.t(9.6, color: O.ink)),
+        ]),
+      );
 
   /* ==========================================================
      سند قبض
