@@ -574,6 +574,16 @@ class Org {
   String iban;
   bool showStamp;
   bool showWatermark;
+  /// تفعيل ضريبة القيمة المضافة في المستندات (من الإعدادات)
+  bool vatEnabled;
+  /// نسبة الضريبة الافتراضية (نقاط أساس: 1500 = 15%)
+  int vatRateBp;
+  /// تفعيل حقل الخصم في المستندات
+  bool discountEnabled;
+  /// إظهار حقل العربون عند إنشاء الفاتورة
+  bool depositEnabled;
+  /// الثيم: night / dawn / charcoal
+  String theme;
   String invPrefix;
   int invPad;
   int invStart;
@@ -596,6 +606,11 @@ class Org {
     this.iban = 'SA7310000001400017244409',
     this.showStamp = true,
     this.showWatermark = true,
+    this.vatEnabled = false,
+    this.vatRateBp = 1500,
+    this.discountEnabled = false,
+    this.depositEnabled = true,
+    this.theme = 'night',
     this.invPrefix = 'INV-',
     this.invPad = 4,
     this.invStart = 1,
@@ -608,7 +623,9 @@ class Org {
         'name': name, 'nameEn': nameEn, 'cr': cr, 'vat': vat, 'kingdom': kingdom, 'city': city,
         'website': website, 'email': email, 'phone': phone, 'bankName': bankName,
         'bankAccount': bankAccount, 'iban': iban, 'showStamp': showStamp,
-        'showWatermark': showWatermark, 'invPrefix': invPrefix, 'invPad': invPad,
+        'showWatermark': showWatermark, 'vatEnabled': vatEnabled, 'vatRateBp': vatRateBp,
+        'discountEnabled': discountEnabled, 'depositEnabled': depositEnabled, 'theme': theme,
+        'invPrefix': invPrefix, 'invPad': invPad,
         'invStart': invStart, 'quotePrefix': quotePrefix, 'invoiceTerms': invoiceTerms,
         'quoteTerms': quoteTerms,
       };
@@ -632,6 +649,11 @@ class Org {
       iban: s('iban', d.iban),
       showStamp: (m['showStamp'] as bool?) ?? true,
       showWatermark: (m['showWatermark'] as bool?) ?? true,
+      vatEnabled: (m['vatEnabled'] as bool?) ?? false,
+      vatRateBp: (m['vatRateBp'] as num?)?.toInt() ?? 1500,
+      discountEnabled: (m['discountEnabled'] as bool?) ?? false,
+      depositEnabled: (m['depositEnabled'] as bool?) ?? true,
+      theme: (m['theme'] as String?) ?? 'night',
       invPrefix: (m['invPrefix'] ?? d.invPrefix) as String,
       invPad: (m['invPad'] as num?)?.toInt() ?? 4,
       invStart: (m['invStart'] as num?)?.toInt() ?? 1,

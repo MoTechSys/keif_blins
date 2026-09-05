@@ -61,7 +61,7 @@ class _PaymentFormState extends State<PaymentForm> {
         actions: [
           if (isEdit)
             IconButton(
-              icon: const Icon(Icons.delete_outline, color: C.red),
+              icon: Icon(Icons.delete_outline, color: C.red),
               onPressed: () async {
                 if (await confirm(context, 'حذف الدفعة', 'سيُحذف السند ${p.receiptNumber} نهائيًا.')) {
                   await store.deletePayment(p.id);
@@ -76,7 +76,7 @@ class _PaymentFormState extends State<PaymentForm> {
         child: ListView(padding: const EdgeInsets.all(16), children: [
           DropdownButtonFormField<String>(
             initialValue: store.clients.any((c) => c.id == p.clientId) ? p.clientId : store.clients.first.id,
-            decoration: const InputDecoration(labelText: 'العميل', prefixIcon: Icon(Icons.business_outlined, color: C.muted, size: 20)),
+            decoration: InputDecoration(labelText: 'العميل', prefixIcon: Icon(Icons.business_outlined, color: C.muted, size: 20)),
             dropdownColor: C.bg2,
             items: [for (final c in store.clients) DropdownMenuItem(value: c.id, child: Text(c.name, overflow: TextOverflow.ellipsis))],
             onChanged: isEdit ? null : (v) => setState(() {
@@ -87,7 +87,7 @@ class _PaymentFormState extends State<PaymentForm> {
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             initialValue: openInvs.any((i) => i.id == p.invoiceId) ? p.invoiceId : '',
-            decoration: const InputDecoration(labelText: 'تخصيص لفاتورة', prefixIcon: Icon(Icons.receipt_long_outlined, color: C.muted, size: 20)),
+            decoration: InputDecoration(labelText: 'تخصيص لفاتورة', prefixIcon: Icon(Icons.receipt_long_outlined, color: C.muted, size: 20)),
             dropdownColor: C.bg2,
             items: [
               const DropdownMenuItem(value: '', child: Text('دفعة على الحساب (بدون فاتورة)')),
@@ -113,14 +113,14 @@ class _PaymentFormState extends State<PaymentForm> {
                 if (v != null) setState(() => p.date = v);
               },
               child: InputDecorator(
-                decoration: const InputDecoration(labelText: 'تاريخ الدفع', prefixIcon: Icon(Icons.event_outlined, color: C.muted, size: 20)),
+                decoration: InputDecoration(labelText: 'تاريخ الدفع', prefixIcon: Icon(Icons.event_outlined, color: C.muted, size: 20)),
                 child: Text(fmtDate(p.date), style: const TextStyle(fontWeight: FontWeight.w700)),
               ),
             ),
           ),
           DropdownButtonFormField<String>(
             initialValue: payMethods.contains(p.method) ? p.method : payMethods.first,
-            decoration: const InputDecoration(labelText: 'طريقة الدفع', prefixIcon: Icon(Icons.credit_card_outlined, color: C.muted, size: 20)),
+            decoration: InputDecoration(labelText: 'طريقة الدفع', prefixIcon: Icon(Icons.credit_card_outlined, color: C.muted, size: 20)),
             dropdownColor: C.bg2,
             items: [for (final m in payMethods) DropdownMenuItem(value: m, child: Text(m))],
             onChanged: (v) => setState(() => p.method = v!),

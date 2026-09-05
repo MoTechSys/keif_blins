@@ -89,7 +89,7 @@ class _LockScreenState extends State<LockScreen> {
                 ),
                 if (lock.failedAttempts > 0 && cd == 0) ...[
                   const SizedBox(height: 14),
-                  Text('محاولات خاطئة: ${lock.failedAttempts}', style: const TextStyle(color: C.red, fontSize: 12.5)),
+                  Text('محاولات خاطئة: ${lock.failedAttempts}', style: TextStyle(color: C.red, fontSize: 12.5)),
                 ],
               ]),
             ),
@@ -143,7 +143,7 @@ class PinPad extends StatelessWidget {
           padding: const EdgeInsets.all(6),
           child: Material(
             color: onTap == null ? Colors.transparent : C.card,
-            shape: const CircleBorder(side: BorderSide(color: C.line)),
+            shape: CircleBorder(side: BorderSide(color: C.line)),
             child: InkWell(
               customBorder: const CircleBorder(),
               onTap: enabled ? onTap : null,
@@ -201,7 +201,7 @@ class _PinDialogState extends State<_PinDialog> {
         contentPadding: const EdgeInsets.fromLTRB(8, 16, 8, 0),
         content: Column(mainAxisSize: MainAxisSize.min, children: [
           if (widget.hint != null) ...[
-            Text(widget.hint!, style: const TextStyle(color: C.muted, fontSize: 12.5), textAlign: TextAlign.center),
+            Text(widget.hint!, style: TextStyle(color: C.muted, fontSize: 12.5), textAlign: TextAlign.center),
             const SizedBox(height: 14),
           ],
           PinDots(length: _pin.length),

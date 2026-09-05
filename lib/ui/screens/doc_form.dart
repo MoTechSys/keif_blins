@@ -87,7 +87,7 @@ class _DocFormState extends State<DocForm> {
           // العميل
           DropdownButtonFormField<String>(
             initialValue: store.clients.any((c) => c.id == d.clientId) ? d.clientId : store.clients.first.id,
-            decoration: const InputDecoration(labelText: 'العميل', prefixIcon: Icon(Icons.business_outlined, color: C.muted, size: 20)),
+            decoration: InputDecoration(labelText: 'العميل', prefixIcon: Icon(Icons.business_outlined, color: C.muted, size: 20)),
             dropdownColor: C.bg2,
             items: [for (final c in store.clients) DropdownMenuItem(value: c.id, child: Text(c.name, overflow: TextOverflow.ellipsis))],
             onChanged: (v) => setState(() => d.clientId = v!),
@@ -131,7 +131,7 @@ class _DocFormState extends State<DocForm> {
                 selectedBackgroundColor: C.gold,
                 selectedForegroundColor: C.bg,
                 foregroundColor: C.text,
-                side: const BorderSide(color: C.line),
+                side: BorderSide(color: C.line),
                 textStyle: const TextStyle(fontFamily: 'Tajawal', fontWeight: FontWeight.w800),
               ),
               segments: const [
@@ -172,12 +172,12 @@ class _DocFormState extends State<DocForm> {
       bottomNavigationBar: SafeArea(
         child: Container(
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-          decoration: const BoxDecoration(color: C.bg2, border: Border(top: BorderSide(color: C.line))),
+          decoration: BoxDecoration(color: C.bg2, border: Border(top: BorderSide(color: C.line))),
           child: Row(children: [
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
                 Text('المجموع ${fmt(t.subtotal, trimZeros: true)}${t.discount > 0 ? ' − خصم ${fmt(t.discount, trimZeros: true)}' : ''}${t.vat > 0 ? ' + ضريبة ${fmt(t.vat, trimZeros: true)}' : ''}',
-                    style: const TextStyle(color: C.muted, fontSize: 11.5)),
+                    style: TextStyle(color: C.muted, fontSize: 11.5)),
                 Money(t.total, size: 22, color: C.goldLight),
               ]),
             ),
@@ -205,8 +205,8 @@ class _DocFormState extends State<DocForm> {
           child: InputDecorator(
             decoration: InputDecoration(
               labelText: label,
-              prefixIcon: const Icon(Icons.event_outlined, color: C.muted, size: 20),
-              suffixIcon: clearable && value.isNotEmpty ? IconButton(icon: const Icon(Icons.close, size: 18, color: C.muted), onPressed: () => setState(() => set(''))) : null,
+              prefixIcon: Icon(Icons.event_outlined, color: C.muted, size: 20),
+              suffixIcon: clearable && value.isNotEmpty ? IconButton(icon: Icon(Icons.close, size: 18, color: C.muted), onPressed: () => setState(() => set(''))) : null,
             ),
             child: Text(value.isEmpty ? '—' : fmtDate(value), style: const TextStyle(fontWeight: FontWeight.w700)),
           ),
@@ -225,13 +225,13 @@ class _DocFormState extends State<DocForm> {
               width: 24,
               height: 24,
               alignment: Alignment.center,
-              decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [C.goldDark, C.gold, C.goldLight])),
-              child: Text('${i + 1}', style: const TextStyle(color: C.bg, fontWeight: FontWeight.w900, fontSize: 12)),
+              decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [C.goldDark, C.gold, C.goldLight])),
+              child: Text('${i + 1}', style: TextStyle(color: C.bg, fontWeight: FontWeight.w900, fontSize: 12)),
             ),
             const SizedBox(width: 8),
             Expanded(child: Money(c.toItem().total, size: 15, color: C.goldLight)),
             IconButton(
-              icon: const Icon(Icons.delete_outline, color: C.red, size: 20),
+              icon: Icon(Icons.delete_outline, color: C.red, size: 20),
               onPressed: items.length == 1 ? null : () => setState(() => items.removeAt(i).dispose()),
             ),
           ]),

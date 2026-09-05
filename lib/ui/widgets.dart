@@ -7,6 +7,173 @@ import '../core/models.dart';
 import '../core/money.dart';
 import 'theme.dart';
 
+/* ============================================================
+   الأيقونات ثلاثية الأبعاد (assets/ic — PNG من التصميم الأصلي)
+   ============================================================ */
+class Ic {
+  static const alert = 'alert', calendar = 'calendar', cash = 'cash', chart = 'chart', check = 'check';
+  static const clients = 'clients', dallah = 'dallah', edit = 'edit', gear = 'gear', invoice = 'invoice';
+  static const pdf = 'pdf', phone = 'phone', pin = 'pin', plus = 'plus', print = 'print', search = 'search';
+  static const share = 'share', stamp = 'stamp', statement = 'statement', trash = 'trash';
+}
+
+class KIcon extends StatelessWidget {
+  final String name;
+  final double size;
+  final double opacity;
+  const KIcon(this.name, {super.key, this.size = 28, this.opacity = 1});
+  @override
+  Widget build(BuildContext context) => Opacity(
+        opacity: opacity,
+        child: Image.asset('assets/ic/$name.png', width: size, height: size, filterQuality: FilterQuality.medium),
+      );
+}
+
+/* ============================================================
+   Plate — اللوح الزجاجي ثلاثي الأبعاد (premium.css .plate)
+   ============================================================ */
+class Plate extends StatelessWidget {
+  final Widget child;
+  final PlateColor color;
+  final double size;
+  final VoidCallback? onTap;
+  const Plate({super.key, required this.child, this.color = PlateColor.gold, this.size = 56, this.onTap});
+
+  /// لوح يحمل أيقونة 3D (الأيقونة ≈ 60% من اللوح)
+  factory Plate.icon(String icon, {Key? key, PlateColor color = PlateColor.gold, double size = 56, VoidCallback? onTap}) =>
+      Plate(key: key, color: color, size: size, onTap: onTap, child: KIcon(icon, size: size * 0.6));
+
+  /// لوح يحمل أيقونة Material (لون الحبر من اللوح)
+  factory Plate.material(IconData icon, {Key? key, PlateColor color = PlateColor.gold, double size = 56, VoidCallback? onTap}) =>
+      Plate(key: key, color: color, size: size, onTap: onTap, child: Icon(icon, size: size * 0.5, color: PlateTones.of(color).ink));
+
+  @override
+  Widget build(BuildContext context) {
+    final t = PlateTones.of(color);
+    final r = BorderRadius.circular(size * 0.28);
+    Widget plate = Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        borderRadius: r,
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [t.top, Color.lerp(t.top, t.body, 0.55)!, t.body, Color.lerp(t.body, t.bottom, 0.45)!, t.bottom],
+          stops: const [0, 0.22, 0.52, 0.78, 1],
+        ),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withValues(alpha: C.isDark ? 0.42 : 0.18), blurRadius: 8, offset: const Offset(0, 4)),
+          BoxShadow(color: Colors.black.withValues(alpha: C.isDark ? 0.5 : 0.12), blurRadius: 22, offset: const Offset(0, 10), spreadRadius: -6),
+          BoxShadow(color: t.glow.withValues(alpha: 0.38), blurRadius: 18, offset: const Offset(0, 6), spreadRadius: -4),
+        ],
+      ),
+      child: Stack(children: [
+        // حلقة داخلية + خط علوي لامع
+        Positioned.fill(
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: r,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.white.withValues(alpha: 0.32), Colors.white.withValues(alpha: 0.06), Colors.transparent, Colors.black.withValues(alpha: 0.22)],
+                stops: const [0, 0.18, 0.55, 1],
+              ),
+            ),
+          ),
+        ),
+        // بريق العدسة العلوي
+        Positioned(
+          top: size * 0.06,
+          left: size * 0.12,
+          right: size * 0.12,
+          height: size * 0.36,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.vertical(top: Radius.circular(size * 0.22), bottom: Radius.elliptical(size * 0.4, size * 0.2)),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Colors.white.withValues(alpha: 0.42), Colors.white.withValues(alpha: 0.0)],
+              ),
+            ),
+          ),
+        ),
+        Center(child: child),
+      ]),
+    );
+    if (onTap == null) return plate;
+    return GestureDetector(onTap: onTap, behavior: HitTestBehavior.opaque, child: plate);
+  }
+}
+
+/// زر كبير بلوح 3D + عنوان (الإجراءات السريعة في الرئيسية)
+class PlateAction extends StatelessWidget {
+  final String icon;
+  final String label;
+  final PlateColor color;
+  final VoidCallback onTap;
+  final String? hint;
+  const PlateAction({super.key, required this.icon, required this.label, required this.onTap, this.color = PlateColor.gold, this.hint});
+  @override
+  Widget build(BuildContext context) => Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: onTap,
+          child: Ink(
+            decoration: BoxDecoration(gradient: C.cardGradient, borderRadius: BorderRadius.circular(18), border: Border.all(color: C.line2)),
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 6),
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              Plate.icon(icon, color: color, size: 54),
+              const SizedBox(height: 10),
+              Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: C.text), textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis),
+              if (hint != null) ...[const SizedBox(height: 2), Text(hint!, style: TextStyle(fontSize: 10.5, color: C.text3), textAlign: TextAlign.center)],
+            ]),
+          ),
+        ),
+      );
+}
+
+/// صورة رمزية للعميل: الحرف الأول على لوح ذهبي (row__ic في التصميم الأصلي)
+class Avatar extends StatelessWidget {
+  final String name;
+  final double size;
+  const Avatar(this.name, {super.key, this.size = 44});
+  @override
+  Widget build(BuildContext context) => Container(
+        width: size,
+        height: size,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: [C.surface3, C.surface2], begin: Alignment.topLeft, end: Alignment.bottomRight),
+          borderRadius: BorderRadius.circular(size * 0.3),
+          border: Border.all(color: C.line),
+        ),
+        child: Text(name.trim().isEmpty ? '؟' : name.trim()[0], style: TextStyle(color: C.goldInk, fontWeight: FontWeight.w900, fontSize: size * 0.42)),
+      );
+}
+
+/// شارة ذهبية صغيرة (رأس الصفحة)
+class GoldBadge extends StatelessWidget {
+  final Widget child;
+  final double size;
+  const GoldBadge({super.key, required this.child, this.size = 40});
+  @override
+  Widget build(BuildContext context) => Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(colors: [C.gold2, C.goldDeep], begin: Alignment.topLeft, end: Alignment.bottomRight),
+          borderRadius: BorderRadius.circular(size * 0.3),
+          boxShadow: [BoxShadow(color: C.gold.withValues(alpha: 0.35), blurRadius: 14, offset: const Offset(0, 4))],
+        ),
+        child: Center(child: child),
+      );
+}
+
 class SectionTitle extends StatelessWidget {
   final String title;
   final Widget? action;
@@ -32,14 +199,19 @@ class GoldCard extends StatelessWidget {
   const GoldCard({super.key, required this.child, this.padding = const EdgeInsets.all(14), this.onTap, this.color});
   @override
   Widget build(BuildContext context) => Material(
-        color: color ?? C.card,
-        borderRadius: BorderRadius.circular(16),
+        color: Colors.transparent,
         child: InkWell(
           borderRadius: BorderRadius.circular(16),
           onTap: onTap,
-          child: Container(
+          child: Ink(
             padding: padding,
-            decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), border: Border.all(color: C.line)),
+            decoration: BoxDecoration(
+              color: color,
+              gradient: color == null ? C.cardGradient : null,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: C.line2),
+              boxShadow: C.isDark ? null : [BoxShadow(color: const Color(0xFF1E2A4A).withValues(alpha: 0.06), blurRadius: 12, offset: const Offset(0, 4))],
+            ),
             child: child,
           ),
         ),
@@ -86,7 +258,7 @@ class Money extends StatelessWidget {
   final double size;
   final Color color;
   final bool smart;
-  const Money(this.halalas, {super.key, this.size = 15, this.color = C.text, this.smart = true});
+  Money(this.halalas, {super.key, this.size = 15, Color? color, this.smart = true}) : color = color ?? C.text;
   @override
   Widget build(BuildContext context) => Text.rich(
         TextSpan(children: [
@@ -116,7 +288,7 @@ class EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-            if (hint != null) ...[const SizedBox(height: 6), Text(hint!, textAlign: TextAlign.center, style: const TextStyle(color: C.muted))],
+            if (hint != null) ...[SizedBox(height: 6), Text(hint!, textAlign: TextAlign.center, style: TextStyle(color: C.muted))],
             if (action != null) ...[const SizedBox(height: 18), action!],
           ]),
         ),
@@ -181,7 +353,7 @@ Future<String?> pickDate(BuildContext context, String current) async {
     lastDate: DateTime(2035),
     locale: const Locale('ar'),
     builder: (ctx, child) => Theme(
-      data: Theme.of(ctx).copyWith(colorScheme: const ColorScheme.dark(primary: C.gold, onPrimary: C.bg, surface: C.bg2, onSurface: C.text)),
+      data: Theme.of(ctx).copyWith(colorScheme: ColorScheme.dark(primary: C.gold, onPrimary: C.bg, surface: C.bg2, onSurface: C.text)),
       child: child!,
     ),
   );
@@ -215,7 +387,7 @@ Future<bool> runBusy(BuildContext context, String label, Future<void> Function()
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             const CircularProgressIndicator(),
             const SizedBox(height: 14),
-            Text(label, style: const TextStyle(fontWeight: FontWeight.w700, color: C.text, decoration: TextDecoration.none, fontSize: 14)),
+            Text(label, style: TextStyle(fontWeight: FontWeight.w700, color: C.text, decoration: TextDecoration.none, fontSize: 14)),
           ]),
         ),
       ),
@@ -241,7 +413,7 @@ Future<bool> confirm(BuildContext context, String title, String body, {String ok
     context: context,
     builder: (ctx) => AlertDialog(
       title: Text(title),
-      content: Text(body, style: const TextStyle(color: C.muted)),
+      content: Text(body, style: TextStyle(color: C.muted)),
       actions: [
         TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
         FilledButton(
@@ -266,15 +438,7 @@ class QuickAction extends StatelessWidget {
         onTap: onTap,
         padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [C.goldDark, C.gold, C.goldLight], begin: Alignment.topLeft, end: Alignment.bottomRight),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Icon(icon, color: C.bg, size: 24),
-          ),
+          Plate.material(icon, size: 48),
           const SizedBox(height: 8),
           Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800), textAlign: TextAlign.center),
         ]),
@@ -285,13 +449,13 @@ class KpiTile extends StatelessWidget {
   final String label;
   final int value;
   final Color color;
-  const KpiTile(this.label, this.value, {super.key, this.color = C.text});
+  KpiTile(this.label, this.value, {super.key, Color? color}) : color = color ?? C.text;
   @override
   Widget build(BuildContext context) => Expanded(
         child: GoldCard(
           padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(label, style: const TextStyle(color: C.muted, fontSize: 11.5, fontWeight: FontWeight.w700)),
+            Text(label, style: TextStyle(color: C.muted, fontSize: 11.5, fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
             FittedBox(fit: BoxFit.scaleDown, alignment: AlignmentDirectional.centerStart, child: Money(value, size: 16, color: color)),
           ]),

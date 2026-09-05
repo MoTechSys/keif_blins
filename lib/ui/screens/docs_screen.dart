@@ -61,7 +61,7 @@ class _DocsScreenState extends State<DocsScreen> with SingleTickerProviderStateM
           padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
           child: TextField(
             onChanged: (v) => setState(() => _q = v.trim()),
-            decoration: const InputDecoration(hintText: 'بحث بالرقم أو العميل…', prefixIcon: Icon(Icons.search, color: C.muted)),
+            decoration: InputDecoration(hintText: 'بحث بالرقم أو العميل…', prefixIcon: Icon(Icons.search, color: C.muted)),
           ),
         ),
         SizedBox(
@@ -143,7 +143,7 @@ class _DocsScreenState extends State<DocsScreen> with SingleTickerProviderStateM
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(d.clientName, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14.5)),
                 const SizedBox(height: 3),
-                Text('${d.number} • ${fmtDate(d.issueDate)}${d.location.isNotEmpty ? ' • ${d.location}' : ''}', style: const TextStyle(color: C.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text('${d.number} • ${fmtDate(d.issueDate)}${d.location.isNotEmpty ? ' • ${d.location}' : ''}', style: TextStyle(color: C.muted, fontSize: 12), maxLines: 1, overflow: TextOverflow.ellipsis),
               ]),
             ),
             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [

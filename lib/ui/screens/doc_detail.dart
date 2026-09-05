@@ -58,8 +58,8 @@ class DocDetail extends StatelessWidget {
                   }
               }
             },
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'dup', child: Text('نسخ كمستند جديد')),
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'dup', child: Text('نسخ كمستند جديد')),
               PopupMenuItem(value: 'del', child: Text('حذف', style: TextStyle(color: C.red))),
             ],
           ),
@@ -87,13 +87,13 @@ class DocDetail extends StatelessWidget {
                 if (d.location.isNotEmpty) d.location,
                 if (isQ && d.validUntil.isNotEmpty) 'ساري حتى ${fmtDate(d.validUntil)}',
               ].join(' • '),
-              style: const TextStyle(color: C.muted, fontSize: 12.5),
+              style: TextStyle(color: C.muted, fontSize: 12.5),
             ),
             const Divider(height: 22),
             Row(children: [
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(isQ ? 'إجمالي العرض' : 'الإجمالي', style: const TextStyle(color: C.goldLight, fontSize: 12, fontWeight: FontWeight.w700)),
+                  Text(isQ ? 'إجمالي العرض' : 'الإجمالي', style: TextStyle(color: C.goldLight, fontSize: 12, fontWeight: FontWeight.w700)),
                   Money(t.total, size: 26),
                 ]),
               ),
@@ -182,8 +182,8 @@ class DocDetail extends StatelessWidget {
                     width: 24,
                     height: 24,
                     alignment: Alignment.center,
-                    decoration: const BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [C.goldDark, C.gold, C.goldLight])),
-                    child: Text('${i + 1}', style: const TextStyle(color: C.bg, fontWeight: FontWeight.w900, fontSize: 12)),
+                    decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [C.goldDark, C.gold, C.goldLight])),
+                    child: Text('${i + 1}', style: TextStyle(color: C.bg, fontWeight: FontWeight.w900, fontSize: 12)),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -191,7 +191,7 @@ class DocDetail extends StatelessWidget {
                       Text(d.items[i].desc.split('\n').first, style: const TextStyle(fontWeight: FontWeight.w800)),
                       Text(
                         '${fmt(d.items[i].unitPrice, trimZeros: true)} × ${fmtQty(d.items[i].qty)} ${d.items[i].unitLabel}${d.items[i].external > 0 ? ' + مشتريات ${fmt(d.items[i].external, trimZeros: true)}' : ''}',
-                        style: const TextStyle(color: C.muted, fontSize: 12),
+                        style: TextStyle(color: C.muted, fontSize: 12),
                       ),
                     ]),
                   ),
@@ -223,7 +223,7 @@ class DocDetail extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                 onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentForm(clientId: d.clientId, payment: p))),
                 child: Row(children: [
-                  const Icon(Icons.payments_outlined, color: C.green, size: 20),
+                  Icon(Icons.payments_outlined, color: C.green, size: 20),
                   const SizedBox(width: 10),
                   Expanded(child: Text('${p.receiptNumber} • ${p.method} • ${fmtDate(p.date)}', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700))),
                   Money(p.amount, size: 14, color: C.green),
@@ -231,7 +231,7 @@ class DocDetail extends StatelessWidget {
               ),
             ),
         ],
-        if (d.notes.isNotEmpty) ...[const SectionTitle('ملاحظات'), Text(d.notes, style: const TextStyle(color: C.muted))],
+        if (d.notes.isNotEmpty) ...[SectionTitle('ملاحظات'), Text(d.notes, style: TextStyle(color: C.muted))],
       ]),
     );
   }

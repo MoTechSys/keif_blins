@@ -44,7 +44,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
           padding: const EdgeInsets.fromLTRB(14, 4, 14, 8),
           child: TextField(
             onChanged: (v) => setState(() => _q = v.trim()),
-            decoration: const InputDecoration(hintText: 'بحث بالاسم أو الهاتف…', prefixIcon: Icon(Icons.search, color: C.muted)),
+            decoration: InputDecoration(hintText: 'بحث بالاسم أو الهاتف…', prefixIcon: Icon(Icons.search, color: C.muted)),
           ),
         ),
         Expanded(
@@ -61,7 +61,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
                       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ClientDetail(id: c.id))),
                       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                       child: Row(children: [
-                        _Avatar(c.name),
+                        Avatar(c.name),
                         const SizedBox(width: 12),
                         Expanded(
                           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -69,7 +69,7 @@ class _ClientsScreenState extends State<ClientsScreen> {
                             const SizedBox(height: 3),
                             Text(
                               [if (c.phone.isNotEmpty) c.phone, '${s.invoiceCount} فاتورة'].join(' • '),
-                              style: const TextStyle(color: C.muted, fontSize: 12),
+                              style: TextStyle(color: C.muted, fontSize: 12),
                             ),
                           ]),
                         ),
@@ -85,22 +85,6 @@ class _ClientsScreenState extends State<ClientsScreen> {
       ]),
     );
   }
-}
-
-class _Avatar extends StatelessWidget {
-  final String name;
-  const _Avatar(this.name);
-  @override
-  Widget build(BuildContext context) => Container(
-        width: 44,
-        height: 44,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(colors: [C.goldDark, C.gold, C.goldLight], begin: Alignment.topLeft, end: Alignment.bottomRight),
-          borderRadius: BorderRadius.circular(13),
-        ),
-        child: Text(name.isEmpty ? '؟' : name.trim()[0], style: const TextStyle(color: C.bg, fontWeight: FontWeight.w900, fontSize: 18)),
-      );
 }
 
 /* ============================================================
@@ -132,14 +116,14 @@ class ClientDetail extends StatelessWidget {
                 if (context.mounted) Navigator.pop(context);
               }
             },
-            itemBuilder: (_) => const [PopupMenuItem(value: 'del', child: Text('حذف العميل', style: TextStyle(color: C.red)))],
+            itemBuilder: (_) => [PopupMenuItem(value: 'del', child: Text('حذف العميل', style: TextStyle(color: C.red)))],
           ),
         ],
       ),
       body: ListView(padding: const EdgeInsets.fromLTRB(14, 4, 14, 30), children: [
         GoldCard(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text('الرصيد المستحق', style: TextStyle(color: C.goldLight, fontWeight: FontWeight.w700)),
+            Text('الرصيد المستحق', style: TextStyle(color: C.goldLight, fontWeight: FontWeight.w700)),
             const SizedBox(height: 6),
             Money(s.outstanding, size: 30, color: s.outstanding > 0 ? C.text : C.green),
             const Divider(height: 22),
@@ -181,14 +165,14 @@ class ClientDetail extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentForm(clientId: c.id, payment: p))),
               child: Row(children: [
-                const Icon(Icons.payments_outlined, color: C.green, size: 20),
+                Icon(Icons.payments_outlined, color: C.green, size: 20),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('${p.receiptNumber} • ${p.method}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
                     Text(
                       '${fmtDate(p.date)}${p.invoiceId.isNotEmpty ? ' • فاتورة ${store.doc(p.invoiceId)?.number ?? ''}' : ' • على الحساب'}',
-                      style: const TextStyle(color: C.muted, fontSize: 12),
+                      style: TextStyle(color: C.muted, fontSize: 12),
                     ),
                   ]),
                 ),
@@ -202,7 +186,7 @@ class ClientDetail extends StatelessWidget {
 
   Widget _info(IconData i, String t) => Padding(
         padding: const EdgeInsets.only(bottom: 6),
-        child: Row(children: [Icon(i, size: 17, color: C.gold), const SizedBox(width: 8), Expanded(child: Text(t, style: const TextStyle(color: C.text, fontSize: 13.5)))]),
+        child: Row(children: [Icon(i, size: 17, color: C.gold), SizedBox(width: 8), Expanded(child: Text(t, style: TextStyle(color: C.text, fontSize: 13.5)))]),
       );
 
   Widget _docRow(BuildContext context, Invoice d, Store store) => Padding(
@@ -218,7 +202,7 @@ class ClientDetail extends StatelessWidget {
                 Text(d.number, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
                 Text(
                   '${fmtDate(d.issueDate)}${d.location.isNotEmpty ? ' • ${d.location}' : ''}',
-                  style: const TextStyle(color: C.muted, fontSize: 12),
+                  style: TextStyle(color: C.muted, fontSize: 12),
                 ),
               ]),
             ),
@@ -235,11 +219,11 @@ class ClientDetail extends StatelessWidget {
 class _Kv extends StatelessWidget {
   final String k, v;
   final Color color;
-  const _Kv(this.k, this.v, {this.color = C.text});
+  _Kv(this.k, this.v, {Color? color}) : color = color ?? C.text;
   @override
   Widget build(BuildContext context) => Expanded(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(k, style: const TextStyle(color: C.muted, fontSize: 11.5)),
+          Text(k, style: TextStyle(color: C.muted, fontSize: 11.5)),
           const SizedBox(height: 2),
           Text(v, style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 13.5)),
         ]),

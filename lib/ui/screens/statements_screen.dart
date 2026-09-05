@@ -34,9 +34,9 @@ class StatementsScreen extends StatelessWidget {
                   return Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(color: C.gold.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14), border: Border.all(color: C.gold.withValues(alpha: 0.35))),
-                    child: const Row(children: [
+                    child: Row(children: [
                       Icon(Icons.info_outline, color: C.gold, size: 20),
-                      SizedBox(width: 10),
+                      const SizedBox(width: 10),
                       Expanded(child: Text('اختر عميلًا لإصدار كشف حساب فاخر بالفترة التي تريدها (هذا الشهر، الشهر الماضي، الكل، أو مخصصة).', style: TextStyle(color: C.text, fontSize: 13))),
                     ]),
                   );
@@ -47,17 +47,17 @@ class StatementsScreen extends StatelessWidget {
                   onTap: () => openStatement(context, c),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   child: Row(children: [
-                    const Icon(Icons.account_balance_wallet_rounded, color: C.gold),
+                    Icon(Icons.account_balance_wallet_rounded, color: C.gold),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text(c.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-                        Text('${s.invoiceCount} فاتورة • ${s.unpaidCount} غير مسددة', style: const TextStyle(color: C.muted, fontSize: 12)),
+                        Text('${s.invoiceCount} فاتورة • ${s.unpaidCount} غير مسددة', style: TextStyle(color: C.muted, fontSize: 12)),
                       ]),
                     ),
                     Money(s.outstanding, size: 15, color: s.outstanding > 0 ? C.text : C.green),
                     const SizedBox(width: 6),
-                    const Icon(Icons.chevron_left, color: C.muted),
+                    Icon(Icons.chevron_left, color: C.muted),
                   ]),
                 );
               },
@@ -147,7 +147,7 @@ class _DateBtn extends StatelessWidget {
           if (v != null) set(v);
         },
         child: InputDecorator(
-          decoration: InputDecoration(labelText: label, prefixIcon: const Icon(Icons.event_outlined, color: C.muted, size: 20)),
+          decoration: InputDecoration(labelText: label, prefixIcon: Icon(Icons.event_outlined, color: C.muted, size: 20)),
           child: Text(value.isEmpty ? '—' : fmtDate(value), style: const TextStyle(fontWeight: FontWeight.w700)),
         ),
       );

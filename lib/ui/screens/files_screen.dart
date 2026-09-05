@@ -72,14 +72,14 @@ class _FilesScreenState extends State<FilesScreen> with SingleTickerProviderStat
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             color: C.bg2,
             child: Row(children: [
-              const Icon(Icons.folder_open_rounded, color: C.gold, size: 18),
+              Icon(Icons.folder_open_rounded, color: C.gold, size: 18),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   _display(_base!),
                   textDirection: TextDirection.ltr,
                   textAlign: TextAlign.right,
-                  style: const TextStyle(color: C.muted, fontSize: 11.5),
+                  style: TextStyle(color: C.muted, fontSize: 11.5),
                   maxLines: 2,
                 ),
               ),
@@ -158,11 +158,11 @@ class _FileTile extends StatelessWidget {
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text(f.name, style: const TextStyle(fontWeight: FontWeight.w800), textDirection: TextDirection.ltr, textAlign: TextAlign.right, maxLines: 1, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 2),
-            Text('$when • ${f.sizeLabel}${year != null ? ' • مجلد $year' : ''}', style: const TextStyle(color: C.muted, fontSize: 11.5)),
+            Text('$when • ${f.sizeLabel}${year != null ? ' • مجلد $year' : ''}', style: TextStyle(color: C.muted, fontSize: 11.5)),
           ]),
         ),
         PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert, color: C.muted),
+          icon: Icon(Icons.more_vert, color: C.muted),
           onSelected: (v) => switch (v) {
             'open' => _open(context),
             'share' => _share(context),
@@ -174,7 +174,7 @@ class _FileTile extends StatelessWidget {
             if (!isBackup) const PopupMenuItem(value: 'open', child: ListTile(leading: Icon(Icons.open_in_new_rounded), title: Text('فتح'))),
             const PopupMenuItem(value: 'share', child: ListTile(leading: Icon(Icons.share_rounded), title: Text('مشاركة الملف'))),
             if (isBackup) const PopupMenuItem(value: 'restore', child: ListTile(leading: Icon(Icons.restore_rounded), title: Text('استرجاع هذه النسخة'))),
-            const PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete_outline, color: C.red), title: Text('حذف', style: TextStyle(color: C.red)))),
+            PopupMenuItem(value: 'delete', child: ListTile(leading: Icon(Icons.delete_outline, color: C.red), title: Text('حذف', style: TextStyle(color: C.red)))),
           ],
         ),
       ]),
@@ -245,9 +245,9 @@ class FilesEntryTile extends StatelessWidget {
       subtitle: Text(
         'Documents/${FileService.appFolder}/ — الفواتير، عروض الأسعار، كشوف الحساب، سندات القبض، النسخ الاحتياطية'
         '${last != null ? '\nآخر نسخة تلقائية: ${fmtDate(last.toIso8601String())}' : ''}',
-        style: const TextStyle(color: C.muted, fontSize: 12),
+        style: TextStyle(color: C.muted, fontSize: 12),
       ),
-      trailing: const Icon(Icons.chevron_left, color: C.muted),
+      trailing: Icon(Icons.chevron_left, color: C.muted),
       onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FilesScreen())),
     );
   }

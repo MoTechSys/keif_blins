@@ -29,19 +29,22 @@ class KeifApp extends StatelessWidget {
         ChangeNotifierProvider.value(value: store),
         ChangeNotifierProvider.value(value: lock),
       ],
-      child: MaterialApp(
-        title: 'كيف الضيافة',
-        debugShowCheckedModeBanner: false,
-        theme: buildTheme(),
-        locale: const Locale('ar'),
-        supportedLocales: const [Locale('ar'), Locale('en')],
-        localizationsDelegates: const [
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
-        builder: (ctx, child) => Directionality(textDirection: TextDirection.rtl, child: child!),
-        home: const Shell(),
+      child: Consumer<Store>(
+        builder: (_, s, __) => MaterialApp(
+          title: 'كيف الضيافة',
+          debugShowCheckedModeBanner: false,
+          theme: buildTheme(AppTheme.fromKey(s.themeKey)),
+          locale: const Locale('ar'),
+          supportedLocales: const [Locale('ar'), Locale('en')],
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          builder: (ctx, child) =>
+              Directionality(textDirection: TextDirection.rtl, child: child!),
+          home: const Shell(),
+        ),
       ),
     );
   }

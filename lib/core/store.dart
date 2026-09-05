@@ -325,6 +325,12 @@ class Store extends ChangeNotifier {
     await _save('org');
   }
 
+  String get themeKey => org.theme;
+  Future<void> setTheme(String key) async {
+    org.theme = key;
+    await _save('org');
+  }
+
   /* ---------- النسخ الاحتياطي ---------- */
   String exportJson() => jsonEncode({
         'app': 'keif-diafa',

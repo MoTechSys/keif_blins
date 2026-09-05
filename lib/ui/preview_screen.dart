@@ -130,12 +130,12 @@ class _PreviewScreenState extends State<PreviewScreen> {
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                       color: C.bg2,
                       child: Row(children: [
-                        const Icon(Icons.folder_rounded, size: 16, color: C.gold),
+                        Icon(Icons.folder_rounded, size: 16, color: C.gold),
                         const SizedBox(width: 6),
                         Expanded(
                           child: Text(
                             'محفوظ في: ${_shortPath(_savedPath!)}',
-                            style: const TextStyle(color: C.muted, fontSize: 11.5),
+                            style: TextStyle(color: C.muted, fontSize: 11.5),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             textDirection: TextDirection.ltr,
@@ -168,7 +168,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
       bottomNavigationBar: SafeArea(
         child: Container(
           padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
-          decoration: const BoxDecoration(color: C.bg2, border: Border(top: BorderSide(color: C.line))),
+          decoration: BoxDecoration(color: C.bg2, border: Border(top: BorderSide(color: C.line))),
           child: Row(children: [
             Expanded(
               child: FilledButton.icon(
