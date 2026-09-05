@@ -1,25 +1,55 @@
-/// settings_screen.dart — شاشات الإعدادات (تُفتح من القائمة الجانبية) | كيف الضيافة
+/// settings_screen.dart — مركز الإعدادات وشاشاته (ملاحظات 4، 8، 11، 12) | كيف الضيافة
+/// الهيكل: الإعدادات → بيانات المؤسسة، إعدادات الفواتير، المظهر، الأمان، سلة المحذوفات، حول التطبيق
 library;
 
 import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../core/file_service.dart';
 import '../../core/lock_service.dart';
 import '../../core/models.dart';
+import '../../core/money.dart';
 import '../../core/store.dart';
+import '../drawer.dart';
 import '../theme.dart';
 import '../widgets.dart';
-import 'files_screen.dart';
 import 'lock_screen.dart';
 
 /* ============================================================
-   إعدادات المستندات: الضريبة/الخصم/العربون (تشك بوكس) + الختم + الترقيم والشروط
+   مركز الإعدادات (ملاحظة 4/12) — إعدادات حقيقية فقط
+   ============================================================ */
+class SettingsHub extends StatelessWidget {
+  static const version = '2.2.0';
+  const SettingsHub({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final store = context.watch<Store>();
+    final lock = context.watch<LockService>();
+    final o = store.org;
+    void open(Widget page) => Navigator.push(context, MaterialPageRoute(builder: (_) => page));
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('الإعدادات')),
+      body: ListView(padding: const EdgeInsets.fromLTRB(12, 10, 12, 30), children: [
+        DrawerItem(Ic.dallah, 'بيانات المؤسسة', '${o.name} • ${o.city}', onTap: () => open(const OrgForm())),
+        DrawerItem(Ic.invoice, 'إعدادات الفواتير', 'الحسابات، الترقيم، الشروط، الختم والشعار، عناصر المستند', onTap: () => open(const DocSettingsScreen())),
+        DrawerItem(Ic.stamp, 'المظهر', AppTheme.fromKey(store.themeKey).label, onTap: () => open(const AppearanceScreen())),
+        DrawerItem(Ic.check, 'الأمان', lock.enabled ? 'قفل التطبيق مفعّل' : 'قفل التطبيق غير مفعّل', onTap: () => open(const SecurityScreen())),
+        DrawerItem(Ic.trash, 'سلة المحذوفات', store.trashCount == 0 ? 'فارغة' : '${store.trashCount} عنصر • تُحذف نهائيًا بعد ${Store.trashDays} يومًا', onTap: () => open(const TrashScreen())),
+        DrawerItem(Ic.pin, 'حول التطبيق', 'الإصدار $version • معين العباسي', onTap: () => open(const AboutScreen())),
+      ]),
+    );
+  }
+}
+
+/* ============================================================
+   إعدادات الفواتير — 4 تبويبات
    ============================================================ */
 class DocSettingsScreen extends StatefulWidget {
   final int initialTab;
@@ -29,7 +59,7 @@ class DocSettingsScreen extends StatefulWidget {
 }
 
 class _DocSettingsScreenState extends State<DocSettingsScreen> with SingleTickerProviderStateMixin {
-  late final TabController _tc = TabController(length: 3, vsync: this, initialIndex: widget.initialTab);
+  late final TabController _tc = TabController(length: 4, vsync: this, initialIndex: widget.initialTab);
   @override
   void dispose() {
     _tc.dispose();
@@ -40,15 +70,34 @@ class _DocSettingsScreenState extends State<DocSettingsScreen> with SingleTicker
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('إعدادات المستندات'),
-        bottom: TabBar(controller: _tc, tabs: const [Tab(text: 'الحسابات'), Tab(text: 'الختم والشعار'), Tab(text: 'الترقيم والشروط')]),
+        title: const Text('إعدادات الفواتير'),
+        bottom: TabBar(
+          controller: _tc,
+          isScrollable: true,
+          tabAlignment: TabAlignment.center,
+          tabs: const [Tab(text: 'الحسابات'), Tab(text: 'الترقيم'), Tab(text: 'عناصر المستند'), Tab(text: 'الختم والشعار')],
+        ),
       ),
-      body: TabBarView(controller: _tc, children: const [_CalcTab(), _StampTab(), _NumberingTab()]),
+      body: TabBarView(controller: _tc, children: const [_CalcTab(), _NumberingTab(), _ElementsTab(), _StampTab()]),
     );
   }
 }
 
-/// تبويب الحسابات — الضريبة والخصم والعربون تشك بوكس
+Widget _check(String icon, String title, String sub, bool value, ValueChanged<bool> on) => CheckboxListTile(
+      secondary: KIcon(icon, size: 30),
+      title: Text(title, style: TextStyle(fontWeight: FontWeight.w800, color: C.text)),
+      subtitle: Text(sub, style: TextStyle(color: C.text3, fontSize: 12)),
+      value: value,
+      controlAffinity: ListTileControlAffinity.trailing,
+      onChanged: (v) => on(v ?? false),
+    );
+
+Widget _hint(String t) => Padding(
+      padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+      child: Text(t, style: TextStyle(color: C.text2, fontSize: 12.5, height: 1.6)),
+    );
+
+/// تبويب الحسابات — الضريبة والخصم والعربون
 class _CalcTab extends StatelessWidget {
   const _CalcTab();
   @override
@@ -56,22 +105,11 @@ class _CalcTab extends StatelessWidget {
     final store = context.watch<Store>();
     final o = store.org;
     return ListView(padding: const EdgeInsets.fromLTRB(14, 12, 14, 30), children: [
-      Padding(
-        padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
-        child: Text('فعّل فقط ما تحتاجه. الخيارات غير المفعّلة لا تظهر عند إنشاء الفاتورة ولا في المستند — لتبقى الفاتورة بسيطة.',
-            style: TextStyle(color: C.text2, fontSize: 12.5, height: 1.6)),
-      ),
+      _hint('فعّل فقط ما تحتاجه. الخيارات غير المفعّلة لا تظهر عند إنشاء الفاتورة ولا في المستند — لتبقى الفاتورة بسيطة.'),
       GoldCard(
         padding: EdgeInsets.zero,
         child: Column(children: [
-          CheckboxListTile(
-            secondary: const KIcon(Ic.cash, size: 30),
-            title: Text('ضريبة القيمة المضافة', style: TextStyle(fontWeight: FontWeight.w800, color: C.text)),
-            subtitle: Text(o.vatEnabled ? 'تُضاف ${o.vatRateBp ~/ 100}% على الفواتير وعروض الأسعار الجديدة' : 'الفواتير بدون ضريبة', style: TextStyle(color: C.text3, fontSize: 12)),
-            value: o.vatEnabled,
-            controlAffinity: ListTileControlAffinity.trailing,
-            onChanged: (v) => store.saveOrg(o..vatEnabled = v ?? false),
-          ),
+          _check(Ic.cash, 'ضريبة القيمة المضافة', o.vatEnabled ? 'تُضاف ${o.vatRateBp ~/ 100}% على الفواتير وعروض الأسعار الجديدة' : 'الفواتير بدون ضريبة', o.vatEnabled, (v) => store.saveOrg(o..vatEnabled = v)),
           if (o.vatEnabled)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
@@ -87,23 +125,55 @@ class _CalcTab extends StatelessWidget {
               ]),
             ),
           const Divider(),
-          CheckboxListTile(
-            secondary: const KIcon(Ic.edit, size: 30),
-            title: Text('الخصم', style: TextStyle(fontWeight: FontWeight.w800, color: C.text)),
-            subtitle: Text(o.discountEnabled ? 'يظهر حقل الخصم عند إنشاء المستند' : 'بدون حقل خصم', style: TextStyle(color: C.text3, fontSize: 12)),
-            value: o.discountEnabled,
-            controlAffinity: ListTileControlAffinity.trailing,
-            onChanged: (v) => store.saveOrg(o..discountEnabled = v ?? false),
-          ),
+          _check(Ic.edit, 'الخصم', o.discountEnabled ? 'يظهر حقل الخصم عند إنشاء المستند' : 'بدون حقل خصم', o.discountEnabled, (v) => store.saveOrg(o..discountEnabled = v)),
           const Divider(),
-          CheckboxListTile(
-            secondary: const KIcon(Ic.check, size: 30),
-            title: Text('العربون (الدفعة المقدمة)', style: TextStyle(fontWeight: FontWeight.w800, color: C.text)),
-            subtitle: Text(o.depositEnabled ? 'يظهر حقل العربون في الفاتورة ويُخصم من المستحق' : 'بدون حقل عربون', style: TextStyle(color: C.text3, fontSize: 12)),
-            value: o.depositEnabled,
-            controlAffinity: ListTileControlAffinity.trailing,
-            onChanged: (v) => store.saveOrg(o..depositEnabled = v ?? false),
-          ),
+          _check(Ic.check, 'العربون (الدفعة المقدمة)', o.depositEnabled ? 'يظهر حقل العربون في الفاتورة ويُخصم من المستحق' : 'بدون حقل عربون', o.depositEnabled, (v) => store.saveOrg(o..depositEnabled = v)),
+        ]),
+      ),
+    ]);
+  }
+}
+
+/// تبويب عناصر المستند (ملاحظة 11أ) — لا يظهر في PDF إلا ما فُعِّل
+class _ElementsTab extends StatelessWidget {
+  const _ElementsTab();
+  @override
+  Widget build(BuildContext context) {
+    final store = context.watch<Store>();
+    final o = store.org;
+    return ListView(padding: const EdgeInsets.fromLTRB(14, 12, 14, 30), children: [
+      _hint('كل عنصر هنا يظهر في الفاتورة وعرض السعر والكشف والسند فقط إذا كان مفعّلًا وبياناته موجودة. غير المفعّل لا يُطبع إطلاقًا.'),
+      const SectionTitle('الترويسة'),
+      GoldCard(
+        padding: EdgeInsets.zero,
+        child: Column(children: [
+          _check(Ic.pin, 'السجل التجاري', o.cr.isEmpty ? 'أدخل الرقم من «بيانات المؤسسة»' : 'س.ت ${o.cr}', o.showCr, (v) => store.saveOrg(o..showCr = v)),
+          const Divider(),
+          _check(Ic.pin, 'الرقم الضريبي', o.vat.isEmpty ? 'أدخل الرقم من «بيانات المؤسسة»' : 'VAT ${o.vat}', o.showVatNumber, (v) => store.saveOrg(o..showVatNumber = v)),
+        ]),
+      ),
+      const SectionTitle('جسم المستند'),
+      GoldCard(
+        padding: EdgeInsets.zero,
+        child: Column(children: [
+          _check(Ic.calendar, 'بطاقة تفاصيل المناسبة', 'التاريخ والموقع وعدد الضيوف', o.showEventBlock, (v) => store.saveOrg(o..showEventBlock = v)),
+          const Divider(),
+          _check(Ic.cash, 'المدفوع والمتبقي', 'سطر العربون/المدفوع والمتبقي في الفاتورة', o.showRemaining, (v) => store.saveOrg(o..showRemaining = v)),
+          const Divider(),
+          _check(Ic.edit, 'المبلغ كتابةً (تفقيط)', 'مثال: «فقط خمسة آلاف ريال لا غير»', o.showTafqit, (v) => store.saveOrg(o..showTafqit = v)),
+          const Divider(),
+          _check(Ic.statement, 'الشروط والأحكام', 'صندوق الشروط أسفل المستند', o.showTerms, (v) => store.saveOrg(o..showTerms = v)),
+          const Divider(),
+          _check(Ic.check, 'إقرار الاستلام', 'نص إقرار العميل باستلام الخدمة', o.showAck, (v) => store.saveOrg(o..showAck = v)),
+        ]),
+      ),
+      const SectionTitle('التذييل'),
+      GoldCard(
+        padding: EdgeInsets.zero,
+        child: Column(children: [
+          _check(Ic.statement, 'الحساب البنكي و IBAN', o.iban.isEmpty && o.bankAccount.isEmpty ? 'أدخل البيانات من «بيانات المؤسسة»' : '${o.bankName} • ${o.iban}', o.showBank, (v) => store.saveOrg(o..showBank = v)),
+          const Divider(),
+          _check(Ic.stamp, 'خانات التوقيع', 'توقيع المؤسسة والعميل', o.showSignatures, (v) => store.saveOrg(o..showSignatures = v)),
         ]),
       ),
     ]);
@@ -120,23 +190,9 @@ class _StampTab extends StatelessWidget {
       GoldCard(
         padding: EdgeInsets.zero,
         child: Column(children: [
-          CheckboxListTile(
-            secondary: const KIcon(Ic.stamp, size: 30),
-            title: Text('إظهار الختم في المستندات', style: TextStyle(fontWeight: FontWeight.w800, color: C.text)),
-            subtitle: Text('يظهر ختم المؤسسة أسفل الفاتورة والكشف والسند', style: TextStyle(color: C.text3, fontSize: 12)),
-            value: o.showStamp,
-            controlAffinity: ListTileControlAffinity.trailing,
-            onChanged: (v) => store.saveOrg(o..showStamp = v ?? true),
-          ),
+          _check(Ic.stamp, 'إظهار الختم في المستندات', 'يظهر ختم المؤسسة أسفل الفاتورة والكشف والسند', o.showStamp, (v) => store.saveOrg(o..showStamp = v)),
           const Divider(),
-          CheckboxListTile(
-            secondary: const KIcon(Ic.dallah, size: 30),
-            title: Text('العلامة المائية (الشعار)', style: TextStyle(fontWeight: FontWeight.w800, color: C.text)),
-            subtitle: Text('شعار شفاف خلف محتوى المستند', style: TextStyle(color: C.text3, fontSize: 12)),
-            value: o.showWatermark,
-            controlAffinity: ListTileControlAffinity.trailing,
-            onChanged: (v) => store.saveOrg(o..showWatermark = v ?? true),
-          ),
+          _check(Ic.dallah, 'العلامة المائية (الشعار)', 'شعار شفاف خلف محتوى المستند', o.showWatermark, (v) => store.saveOrg(o..showWatermark = v)),
         ]),
       ),
       const SizedBox(height: 16),
@@ -167,6 +223,7 @@ class _AssetPreview extends StatelessWidget {
       );
 }
 
+/// تبويب الترقيم والشروط (ملاحظة 11ج) — مع معاينة حيّة للرقم القادم
 class _NumberingTab extends StatefulWidget {
   const _NumberingTab();
   @override
@@ -190,48 +247,164 @@ class _NumberingTabState extends State<_NumberingTab> {
     super.dispose();
   }
 
+  /// نسخة مؤقتة من الإعدادات بحسب الحقول الحالية (للمعاينة)
+  Org get _draft => Org.fromMap(o.toMap())
+    ..invPrefix = c['invPrefix']!.text.trim()
+    ..quotePrefix = c['quotePrefix']!.text.trim()
+    ..invStart = int.tryParse(c['invStart']!.text.trim()) ?? 1;
+
   @override
-  Widget build(BuildContext context) => ListView(padding: const EdgeInsets.fromLTRB(14, 12, 14, 30), children: [
-        const SectionTitle('الترقيم'),
-        Row(children: [
-          Expanded(child: Field('بادئة الفاتورة', controller: c['invPrefix'], direction: TextDirection.ltr)),
-          const SizedBox(width: 10),
-          Expanded(child: Field('بادئة العرض', controller: c['quotePrefix'], direction: TextDirection.ltr)),
-          const SizedBox(width: 10),
-          Expanded(child: Field('يبدأ من', controller: c['invStart'], type: TextInputType.number)),
+  Widget build(BuildContext context) {
+    final store = context.read<Store>();
+    final d = _draft;
+    final seq = o.numberingMode == 'seq';
+    return ListView(padding: const EdgeInsets.fromLTRB(14, 12, 14, 30), children: [
+      const SectionTitle('نمط الترقيم'),
+      GoldCard(
+        padding: EdgeInsets.zero,
+        child: RadioGroup<String>(
+          groupValue: o.numberingMode,
+          onChanged: (v) => setState(() => o.numberingMode = v ?? 'seq'),
+          child: Column(children: [
+          RadioListTile<String>(
+            value: 'seq',
+            title: Text('تسلسلي', style: TextStyle(fontWeight: FontWeight.w800, color: C.text)),
+            subtitle: Text('بادئة + رقم متزايد يبدأ من الرقم الذي تحدده (INV-0001)', style: TextStyle(color: C.text3, fontSize: 12)),
+          ),
+          if (seq)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text('إدراج السنة في الرقم', style: TextStyle(color: C.text, fontSize: 13.5, fontWeight: FontWeight.w700)),
+                subtitle: Text('INV-2026-0001 ويُعاد العدّ كل سنة', style: TextStyle(color: C.text3, fontSize: 12)),
+                value: o.numberYear,
+                onChanged: (v) => setState(() => o.numberYear = v),
+              ),
+            ),
+          const Divider(height: 1),
+          RadioListTile<String>(
+            value: 'datetime',
+            title: Text('تلقائي من التاريخ والوقت', style: TextStyle(fontWeight: FontWeight.w800, color: C.text)),
+            subtitle: Text('بادئة + التاريخ والوقت عند الإنشاء (INV-20260509-143522)', style: TextStyle(color: C.text3, fontSize: 12)),
+          ),
         ]),
-        const SectionTitle('الشروط الافتراضية'),
-        Field('شروط الفاتورة', controller: c['invoiceTerms'], maxLines: 4),
-        Field('شروط عرض السعر', controller: c['quoteTerms'], maxLines: 4),
-        const SizedBox(height: 8),
-        FilledButton.icon(
-          onPressed: () async {
-            String v(String k) => c[k]!.text.trim();
-            final cur = context.read<Store>().org
-              ..invPrefix = v('invPrefix')
-              ..quotePrefix = v('quotePrefix')
-              ..invStart = int.tryParse(v('invStart')) ?? 1
-              ..invoiceTerms = v('invoiceTerms')
-              ..quoteTerms = v('quoteTerms');
-            await context.read<Store>().saveOrg(cur);
-            if (context.mounted) toast(context, 'تم الحفظ');
-          },
-          icon: const Icon(Icons.save_rounded),
-          label: const Text('حفظ'),
         ),
-      ]);
+      ),
+      const SectionTitle('البادئات'),
+      Row(children: [
+        Expanded(child: Field('بادئة الفاتورة', controller: c['invPrefix'], direction: TextDirection.ltr, onChanged: (_) => setState(() {}))),
+        const SizedBox(width: 10),
+        Expanded(child: Field('بادئة العرض', controller: c['quotePrefix'], direction: TextDirection.ltr, onChanged: (_) => setState(() {}))),
+        if (seq) ...[
+          const SizedBox(width: 10),
+          Expanded(child: Field('يبدأ من', controller: c['invStart'], type: TextInputType.number, onChanged: (_) => setState(() {}))),
+        ],
+      ]),
+      // معاينة حيّة
+      GoldCard(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(children: [
+          Icon(Icons.visibility_outlined, color: C.gold, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('الرقم القادم', style: TextStyle(color: C.text3, fontSize: 11.5)),
+              const SizedBox(height: 2),
+              Text('فاتورة: ${store.previewNumber(d, DocKind.invoice)}', textDirection: TextDirection.rtl, style: TextStyle(color: C.text, fontWeight: FontWeight.w800, fontSize: 13.5)),
+              Text('عرض سعر: ${store.previewNumber(d, DocKind.quotation)}', textDirection: TextDirection.rtl, style: TextStyle(color: C.text, fontWeight: FontWeight.w800, fontSize: 13.5)),
+            ]),
+          ),
+        ]),
+      ),
+      const SectionTitle('الشروط الافتراضية'),
+      Field('شروط الفاتورة', controller: c['invoiceTerms'], maxLines: 4),
+      Field('شروط عرض السعر', controller: c['quoteTerms'], maxLines: 4),
+      const SizedBox(height: 8),
+      FilledButton.icon(
+        onPressed: () async {
+          String v(String k) => c[k]!.text.trim();
+          final cur = store.org
+            ..invPrefix = v('invPrefix')
+            ..quotePrefix = v('quotePrefix')
+            ..invStart = int.tryParse(v('invStart')) ?? 1
+            ..numberingMode = o.numberingMode
+            ..numberYear = o.numberYear
+            ..invoiceTerms = v('invoiceTerms')
+            ..quoteTerms = v('quoteTerms');
+          await store.saveOrg(cur);
+          if (context.mounted) toast(context, 'تم الحفظ');
+        },
+        icon: const Icon(Icons.save_rounded),
+        label: const Text('حفظ'),
+      ),
+    ]);
+  }
 }
 
 /* ============================================================
-   الحماية
+   المظهر
+   ============================================================ */
+class AppearanceScreen extends StatelessWidget {
+  const AppearanceScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final store = context.watch<Store>();
+    final cur = AppTheme.fromKey(store.themeKey);
+    return Scaffold(
+      appBar: AppBar(title: const Text('المظهر')),
+      body: ListView(padding: const EdgeInsets.fromLTRB(14, 12, 14, 30), children: [
+        _hint('اختر الثيم الذي يريحك. يُطبَّق فورًا على كل الشاشات ولا يؤثر على مستندات PDF.'),
+        for (final t in AppTheme.values)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: GoldCard(
+              onTap: () => store.setTheme(t.key),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(children: [
+                _ThemeDot(t, selected: t == cur),
+                const SizedBox(width: 12),
+                Expanded(child: Text(t.label, style: TextStyle(fontWeight: FontWeight.w800, color: C.text, fontSize: 14.5))),
+                if (t == cur) Icon(Icons.check_circle_rounded, color: C.gold),
+              ]),
+            ),
+          ),
+      ]),
+    );
+  }
+}
+
+class _ThemeDot extends StatelessWidget {
+  final AppTheme t;
+  final bool selected;
+  const _ThemeDot(this.t, {required this.selected});
+  @override
+  Widget build(BuildContext context) {
+    final p = Palette.of(t);
+    return Container(
+      width: 40,
+      height: 40,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(colors: [p.bg, p.surface2], begin: Alignment.topLeft, end: Alignment.bottomRight),
+        border: Border.all(color: p.gold, width: 2.5),
+        boxShadow: selected ? [BoxShadow(color: C.gold.withValues(alpha: 0.4), blurRadius: 10)] : null,
+      ),
+    );
+  }
+}
+
+/* ============================================================
+   الأمان — القفل + مسح البيانات (بدل «منطقة الخطر» المتفرقة)
    ============================================================ */
 class SecurityScreen extends StatelessWidget {
   const SecurityScreen({super.key});
   @override
   Widget build(BuildContext context) {
     final lock = context.watch<LockService>();
+    final store = context.read<Store>();
     return Scaffold(
-      appBar: AppBar(title: const Text('الحماية')),
+      appBar: AppBar(title: const Text('الأمان')),
       body: ListView(padding: const EdgeInsets.fromLTRB(14, 12, 14, 30), children: [
         GoldCard(
           padding: EdgeInsets.zero,
@@ -250,62 +423,19 @@ class SecurityScreen extends StatelessWidget {
             ),
             if (lock.enabled) ...[
               const Divider(),
-              ListTile(
-                leading: const Icon(Icons.password_rounded),
-                title: const Text('تغيير الرمز'),
-                onTap: () => changePin(context, lock),
-              ),
+              ListTile(leading: const Icon(Icons.password_rounded), title: const Text('تغيير الرمز'), onTap: () => changePin(context, lock)),
               const Divider(),
-              ListTile(
-                leading: const Icon(Icons.lock_clock_rounded),
-                title: const Text('قفل الآن'),
-                onTap: lock.lockNow,
-              ),
+              ListTile(leading: const Icon(Icons.lock_clock_rounded), title: const Text('قفل الآن'), onTap: lock.lockNow),
             ],
           ]),
         ),
-      ]),
-    );
-  }
-}
-
-/* ============================================================
-   ملفات الهاتف (مدخل)
-   ============================================================ */
-class FilesEntryScreen extends StatelessWidget {
-  const FilesEntryScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    if (FileService.supported) return const FilesScreen();
-    return Scaffold(
-      appBar: AppBar(title: const Text('ملفات الهاتف')),
-      body: const EmptyState(
-        icon: Icons.folder_off_outlined,
-        title: 'متاح في تطبيق أندرويد فقط',
-        hint: 'على الويب استخدم "مشاركة/تنزيل" من شاشة معاينة المستند.',
-      ),
-    );
-  }
-}
-
-/* ============================================================
-   منطقة الخطر
-   ============================================================ */
-class DangerScreen extends StatelessWidget {
-  const DangerScreen({super.key});
-  @override
-  Widget build(BuildContext context) {
-    final store = context.read<Store>();
-    final lock = context.read<LockService>();
-    return Scaffold(
-      appBar: AppBar(title: const Text('منطقة الخطر')),
-      body: ListView(padding: const EdgeInsets.fromLTRB(14, 12, 14, 30), children: [
+        const SectionTitle('إعادة الضبط'),
         GoldCard(
           padding: EdgeInsets.zero,
           child: ListTile(
             leading: Icon(Icons.delete_forever_rounded, color: C.red),
             title: Text('مسح جميع البيانات', style: TextStyle(fontWeight: FontWeight.w800, color: C.red)),
-            subtitle: Text('لا يمكن التراجع. احفظ نسخة احتياطية أولًا.', style: TextStyle(color: C.text3, fontSize: 12)),
+            subtitle: Text('لا يمكن التراجع. تُحفظ نسخة أمان في مجلد الهاتف قبل المسح.', style: TextStyle(color: C.text3, fontSize: 12)),
             onTap: () async {
               if (!await confirm(context, 'مسح كل البيانات', 'سيتم حذف جميع العملاء والفواتير والدفعات نهائيًا ولا يمكن استرجاعها.\n\nهل حفظت نسخة احتياطية؟', ok: 'نعم، امسح الكل')) return;
               if (!context.mounted) return;
@@ -319,7 +449,7 @@ class DangerScreen extends StatelessWidget {
                   return;
                 }
               }
-              if (FileService.supported) await FileService.saveBackup(store.exportJson(), 'before-wipe-${DateTime.now().millisecondsSinceEpoch}.json');
+              if (FileService.supported) await FileService.saveBackup(store.exportJson(), 'before-wipe-${Store.backupStamp()}.json');
               await store.wipe();
               if (context.mounted) {
                 toast(context, 'تم مسح جميع البيانات (حُفظت نسخة أمان في مجلد الهاتف)');
@@ -334,93 +464,402 @@ class DangerScreen extends StatelessWidget {
 }
 
 /* ============================================================
-   حول التطبيق
+   سلة المحذوفات (ملاحظة 8) — استرجاع / حذف نهائي / إفراغ
+   ============================================================ */
+class TrashScreen extends StatelessWidget {
+  const TrashScreen({super.key});
+  @override
+  Widget build(BuildContext context) {
+    final store = context.watch<Store>();
+    final total = store.trashCount;
+    return Scaffold(
+      appBar: AppBar(
+        title: Text('سلة المحذوفات ($total)'),
+        actions: [
+          if (total > 0)
+            TextButton.icon(
+              onPressed: () async {
+                if (await confirm(context, 'إفراغ السلة', 'سيُحذف $total عنصرًا نهائيًا ولا يمكن استرجاعها.', ok: 'إفراغ نهائي')) {
+                  await store.emptyTrash();
+                  if (context.mounted) toast(context, 'تم إفراغ السلة');
+                }
+              },
+              icon: Icon(Icons.delete_sweep_rounded, color: C.red, size: 20),
+              label: Text('إفراغ', style: TextStyle(color: C.red, fontWeight: FontWeight.w800)),
+            ),
+        ],
+      ),
+      body: total == 0
+          ? EmptyState(icon: Icons.delete_outline_rounded, title: 'السلة فارغة', hint: 'ما تحذفه يبقى هنا ${Store.trashDays} يومًا ثم يُحذف تلقائيًا.')
+          : ListView(padding: const EdgeInsets.fromLTRB(14, 8, 14, 30), children: [
+              _hint('يمكنك استرجاع أي عنصر أو حذفه نهائيًا. العناصر تُحذف تلقائيًا بعد ${Store.trashDays} يومًا من نقلها هنا.'),
+              if (store.trashClients.isNotEmpty) SectionTitle('العملاء (${store.trashClients.length})'),
+              for (final c in store.trashClients)
+                _TrashRow(
+                  icon: Ic.clients,
+                  title: c.name,
+                  sub: c.phone,
+                  deletedAt: c.deletedAt,
+                  onRestore: () => store.restoreClient(c.id),
+                  onPurge: () => store.purgeClient(c.id),
+                ),
+              if (store.trashDocs.isNotEmpty) SectionTitle('الفواتير والعروض (${store.trashDocs.length})'),
+              for (final d in store.trashDocs)
+                _TrashRow(
+                  icon: d.isQuote ? Ic.edit : Ic.invoice,
+                  title: '${d.isQuote ? 'عرض سعر' : 'فاتورة'} ${d.number}',
+                  sub: '${store.docClientName(d)} • ${fmtSAR(d.totals.total)}',
+                  deletedAt: d.deletedAt,
+                  onRestore: () => store.restoreDoc(d.id),
+                  onPurge: () => store.purgeDoc(d.id),
+                ),
+              if (store.trashPayments.isNotEmpty) SectionTitle('الدفعات (${store.trashPayments.length})'),
+              for (final p in store.trashPayments)
+                _TrashRow(
+                  icon: Ic.cash,
+                  title: 'سند ${p.receiptNumber}',
+                  sub: '${fmtSAR(p.amount)} • ${fmtDate(p.date)}',
+                  deletedAt: p.deletedAt,
+                  onRestore: () => store.restorePayment(p.id),
+                  onPurge: () => store.purgePayment(p.id),
+                ),
+            ]),
+    );
+  }
+}
+
+class _TrashRow extends StatelessWidget {
+  final String icon, title, sub, deletedAt;
+  final Future<void> Function() onRestore, onPurge;
+  const _TrashRow({required this.icon, required this.title, required this.sub, required this.deletedAt, required this.onRestore, required this.onPurge});
+  @override
+  Widget build(BuildContext context) {
+    final left = Store.daysLeft(deletedAt);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: GoldCard(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(children: [
+          KIcon(icon, size: 30),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: C.text), maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(sub, style: TextStyle(color: C.text3, fontSize: 11.5), maxLines: 1, overflow: TextOverflow.ellipsis),
+              Text(left <= 0 ? 'يُحذف اليوم' : 'يبقى $left يومًا', style: TextStyle(color: left <= 3 ? C.red : C.muted, fontSize: 11)),
+            ]),
+          ),
+          IconButton(
+            tooltip: 'استرجاع',
+            icon: Icon(Icons.restore_rounded, color: C.green),
+            onPressed: () async {
+              await onRestore();
+              if (context.mounted) toast(context, 'تم الاسترجاع');
+            },
+          ),
+          IconButton(
+            tooltip: 'حذف نهائي',
+            icon: Icon(Icons.delete_forever_rounded, color: C.red),
+            onPressed: () async {
+              if (await confirm(context, 'حذف نهائي', 'سيُحذف «$title» نهائيًا ولا يمكن استرجاعه.', ok: 'حذف نهائي')) {
+                await onPurge();
+                if (context.mounted) toast(context, 'حُذف نهائيًا');
+              }
+            },
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+/* ============================================================
+   حول التطبيق (ملاحظة 4)
    ============================================================ */
 class AboutScreen extends StatelessWidget {
   const AboutScreen({super.key});
+
+  Future<void> _go(String url) async {
+    final u = Uri.parse(url);
+    try {
+      await launchUrl(u, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+  }
+
   @override
   Widget build(BuildContext context) => Scaffold(
         appBar: AppBar(title: const Text('حول التطبيق')),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(28),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              const Image(image: AssetImage('assets/img/logo.png'), width: 140),
-              const SizedBox(height: 18),
-              Text('كيف الضيافة', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: C.text)),
-              Text('نظام الفواتير وكشوف الحساب', style: TextStyle(color: C.text2)),
-              const SizedBox(height: 8),
-              Text('الإصدار 2.2.0', style: TextStyle(color: C.goldInk, fontWeight: FontWeight.w800)),
-              const SizedBox(height: 18),
-              Text('بياناتك محفوظة على جهازك فقط. استخدم النسخة الاحتياطية لحمايتها.', textAlign: TextAlign.center, style: TextStyle(color: C.text3, fontSize: 12.5, height: 1.6)),
+        body: ListView(padding: const EdgeInsets.fromLTRB(20, 24, 20, 30), children: [
+          Center(child: Image(image: AssetImage(C.isDark ? 'assets/img/logo_light.png' : 'assets/img/logo.png'), width: 130)),
+          const SizedBox(height: 14),
+          Center(child: Text('كيف الضيافة', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: C.text))),
+          Center(child: Text('نظام الفواتير وكشوف الحساب وسندات القبض', style: TextStyle(color: C.text2))),
+          const SizedBox(height: 6),
+          Center(child: Text('الإصدار ${SettingsHub.version}', style: TextStyle(color: C.goldInk, fontWeight: FontWeight.w800))),
+          const SectionTitle('المطوّر'),
+          GoldCard(
+            padding: EdgeInsets.zero,
+            child: Column(children: [
+              ListTile(leading: Icon(Icons.person_rounded, color: C.gold), title: Text('معين العباسي', style: TextStyle(fontWeight: FontWeight.w800, color: C.text)), subtitle: Text('تصميم وتطوير', style: TextStyle(color: C.text3, fontSize: 12))),
+              const Divider(height: 1),
+              ListTile(
+                leading: Icon(Icons.phone_rounded, color: C.gold),
+                title: const Text('+967 770 941 666', textDirection: TextDirection.ltr, textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w800)),
+                subtitle: Text('اتصال / واتساب', style: TextStyle(color: C.text3, fontSize: 12)),
+                trailing: Icon(Icons.chat_rounded, color: C.green, size: 20),
+                onTap: () => _go('https://wa.me/967770941666'),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: Icon(Icons.language_rounded, color: C.gold),
+                title: const Text('alabbasi.uk', textDirection: TextDirection.ltr, textAlign: TextAlign.right, style: TextStyle(fontWeight: FontWeight.w800)),
+                subtitle: Text('الموقع الإلكتروني', style: TextStyle(color: C.text3, fontSize: 12)),
+                trailing: Icon(Icons.open_in_new_rounded, color: C.text3, size: 18),
+                onTap: () => _go('https://alabbasi.uk'),
+              ),
             ]),
           ),
-        ),
+          const SizedBox(height: 18),
+          Text('بياناتك محفوظة على جهازك فقط. استخدم النسخة الاحتياطية لحمايتها.', textAlign: TextAlign.center, style: TextStyle(color: C.text3, fontSize: 12.5, height: 1.6)),
+        ]),
       );
 }
 
 /* ============================================================
-   النسخة الاحتياطية (نسخة مبدئية — تُستكمل في الجزء 4)
+   النسخة الاحتياطية بنمط واتساب (ملاحظة 11ب)
    ============================================================ */
-class BackupScreen extends StatelessWidget {
+class BackupScreen extends StatefulWidget {
   const BackupScreen({super.key});
+  @override
+  State<BackupScreen> createState() => _BackupScreenState();
+}
+
+class _BackupScreenState extends State<BackupScreen> {
+  List<_BackupInfo>? _list;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+  }
+
+  Future<void> _refresh() async {
+    if (!FileService.supported) {
+      setState(() => _list = const []);
+      return;
+    }
+    final files = await FileService.list(FileKind.backup);
+    final out = <_BackupInfo>[];
+    for (final f in files) {
+      Map<String, dynamic>? counts;
+      try {
+        final m = jsonDecode(await FileService.readText(f.path));
+        if (m is Map) {
+          if (m['counts'] is Map) {
+            counts = Map<String, dynamic>.from(m['counts'] as Map);
+          } else if (m['data'] is Map) {
+            final d = m['data'] as Map;
+            counts = {
+              'clients': (d['clients'] as List?)?.length ?? 0,
+              'docs': ((d['docs'] as List?)?.length ?? 0) + ((d['invoices'] as List?)?.length ?? 0),
+              'payments': (d['payments'] as List?)?.length ?? 0,
+            };
+          }
+        }
+      } catch (_) {}
+      out.add(_BackupInfo(f, counts));
+    }
+    if (mounted) setState(() => _list = out);
+  }
+
   @override
   Widget build(BuildContext context) {
     final store = context.watch<Store>();
+    final list = _list;
+    final latest = list == null || list.isEmpty ? null : list.first;
     return Scaffold(
       appBar: AppBar(title: const Text('النسخة الاحتياطية')),
       body: ListView(padding: const EdgeInsets.fromLTRB(14, 12, 14, 30), children: [
+        // ملخص
+        GoldCard(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              const KIcon(Ic.share, size: 34),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('آخر نسخة', style: TextStyle(color: C.text3, fontSize: 12)),
+                  Text(
+                    latest == null ? (store.lastAutoBackupAt == null ? 'لم تُحفظ نسخة بعد' : agoLabel(store.lastAutoBackupAt!)) : _when(latest.file.modified),
+                    style: TextStyle(color: C.text, fontWeight: FontWeight.w800, fontSize: 15),
+                  ),
+                  Text('بياناتك الآن: ${store.clients.length} عميل • ${store.docs.length} مستند • ${store.payments.length} دفعة', style: TextStyle(color: C.text3, fontSize: 11.5)),
+                ]),
+              ),
+            ]),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () => runBusy(context, 'جارٍ إنشاء النسخة…', () async {
+                if (!FileService.supported) {
+                  // على الويب: تنزيل/مشاركة الملف مباشرة
+                  await _shareNow(store);
+                  return;
+                }
+                final p = await store.backupNow();
+                if (p == null) throw Exception('تعذّر الوصول إلى مجلد الهاتف');
+              }).then((ok) {
+                if (!ok || !mounted) return;
+                // ignore: use_build_context_synchronously
+                toast(context, 'تم إنشاء النسخة الاحتياطية');
+                _refresh();
+              }),
+              icon: const Icon(Icons.backup_rounded),
+              label: const Text('إنشاء نسخة احتياطية'),
+            ),
+            if (FileService.supported)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('تُحفظ في مجلد الهاتف: ${FileKind.backup.folder} — باسم keif-backup-التاريخ_الساعة.json', style: TextStyle(color: C.text3, fontSize: 11), textAlign: TextAlign.center),
+              ),
+          ]),
+        ),
+        const SizedBox(height: 10),
         GoldCard(
           padding: EdgeInsets.zero,
           child: Column(children: [
-            if (FileService.supported) ...[
+            if (FileService.supported)
               SwitchListTile(
                 secondary: const Icon(Icons.cloud_sync_rounded),
-                title: Text('نسخة احتياطية تلقائية', style: TextStyle(fontWeight: FontWeight.w800, color: C.text)),
-                subtitle: Text('بعد كل تعديل تُحفظ نسخة اليوم في مجلد الهاتف', style: TextStyle(color: C.text3, fontSize: 12)),
+                title: Text('نسخة تلقائية يومية', style: TextStyle(fontWeight: FontWeight.w800, color: C.text)),
+                subtitle: Text('بعد كل تعديل تُحدَّث نسخة اليوم في مجلد الهاتف', style: TextStyle(color: C.text3, fontSize: 12)),
                 value: store.autoBackupEnabled,
                 onChanged: store.setAutoBackup,
               ),
-              const Divider(),
-              ListTile(
-                leading: const Icon(Icons.save_rounded),
-                title: const Text('حفظ نسخة في مجلد الهاتف الآن'),
-                onTap: () => runBusy(context, 'جارٍ الحفظ…', () async {
-                  final p = await store.backupNow();
-                  if (p == null) throw Exception('تعذّر الوصول إلى مجلد الهاتف');
-                }).then((ok) {
-                  if (ok && context.mounted) toast(context, 'تم حفظ النسخة في مجلد الهاتف');
-                }),
+            if (FileService.supported) const Divider(height: 1),
+            ListTile(
+              leading: Icon(Icons.cloud_upload_outlined, color: C.text3),
+              title: Text('نسخة احتياطية عبر Google', style: TextStyle(fontWeight: FontWeight.w800, color: C.text)),
+              subtitle: Text('قريبًا — رفع النسخة إلى Google Drive واسترجاعها من أي جهاز', style: TextStyle(color: C.text3, fontSize: 12)),
+              trailing: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(color: C.gold.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(8)),
+                child: Text('قريبًا', style: TextStyle(color: C.goldInk, fontSize: 11, fontWeight: FontWeight.w800)),
               ),
-              const Divider(),
-            ],
-            ListTile(
-              leading: const Icon(Icons.send_rounded),
-              title: const Text('إرسال نسخة (واتساب / بريد)'),
-              subtitle: Text('${store.clients.length} عميل • ${store.docs.length} مستند • ${store.payments.length} دفعة', style: TextStyle(color: C.text3, fontSize: 12)),
-              onTap: () => runBusy(context, 'جارٍ تجهيز النسخة…', () async {
-                final json = store.exportJson();
-                final name = 'keif-diafa-backup-${todayISO()}.json';
-                await Share.shareXFiles([XFile.fromData(utf8.encode(json), mimeType: 'application/json', name: name)], subject: name);
-              }),
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.restore_rounded),
-              title: const Text('استرجاع نسخة احتياطية'),
-              onTap: () => importBackupFromFile(context, store),
-            ),
-            const Divider(),
-            ListTile(
-              leading: const Icon(Icons.content_paste_rounded),
-              title: const Text('استرجاع بلصق النص (للمتقدمين)'),
-              onTap: () => importBackupByPaste(context, store),
+              onTap: () => toast(context, 'النسخ عبر Google سيتوفر في تحديث قادم'),
             ),
           ]),
+        ),
+
+        // الاسترجاع
+        const SectionTitle('الاسترجاع'),
+        if (latest != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: OutlinedButton.icon(
+              onPressed: () => _restore(store, latest),
+              icon: const Icon(Icons.restore_rounded),
+              label: Text('استرجاع آخر نسخة (${_when(latest.file.modified)})'),
+            ),
+          ),
+        OutlinedButton.icon(
+          onPressed: () => importBackupFromFile(context, store),
+          icon: const Icon(Icons.folder_open_rounded),
+          label: const Text('اختيار ملف نسخة من الجهاز'),
+        ),
+
+        // قائمة النسخ
+        if (FileService.supported) ...[
+          SectionTitle(
+            'النسخ المحفوظة (${list?.length ?? 0})',
+            action: IconButton(onPressed: _refresh, icon: Icon(Icons.refresh_rounded, color: C.text3, size: 20), tooltip: 'تحديث'),
+          ),
+          if (list == null)
+            const Center(child: Padding(padding: EdgeInsets.all(20), child: CircularProgressIndicator()))
+          else if (list.isEmpty)
+            _hint('لا نسخ محفوظة بعد. اضغط «إنشاء نسخة احتياطية».')
+          else
+            for (final b in list)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: GoldCard(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  onTap: () => _restore(store, b),
+                  child: Row(children: [
+                    Icon(b.file.name.startsWith('auto-') ? Icons.schedule_rounded : Icons.save_rounded, color: C.gold, size: 22),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(_when(b.file.modified), style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: C.text)),
+                        Text(
+                          '${b.file.sizeLabel}${b.counts == null ? '' : ' • ${b.counts!['clients']} عميل • ${b.counts!['docs']} مستند • ${b.counts!['payments']} دفعة'}${b.file.name.startsWith('auto-') ? ' • تلقائية' : ''}',
+                          style: TextStyle(color: C.text3, fontSize: 11.5),
+                          maxLines: 2,
+                        ),
+                        Text(b.file.name, textDirection: TextDirection.ltr, textAlign: TextAlign.right, style: TextStyle(color: C.muted, fontSize: 10.5)),
+                      ]),
+                    ),
+                    PopupMenuButton<String>(
+                      onSelected: (v) async {
+                        switch (v) {
+                          case 'restore':
+                            _restore(store, b);
+                          case 'share':
+                            await FileService.share(b.file.path, subject: b.file.name);
+                          case 'delete':
+                            if (await confirm(context, 'حذف النسخة', 'سيُحذف الملف ${b.file.name} من الهاتف.')) {
+                              await FileService.delete(b.file.path);
+                              _refresh();
+                            }
+                        }
+                      },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(value: 'restore', child: Text('استرجاع')),
+                        const PopupMenuItem(value: 'share', child: Text('مشاركة (واتساب / بريد)')),
+                        PopupMenuItem(value: 'delete', child: Text('حذف', style: TextStyle(color: C.red))),
+                      ],
+                    ),
+                  ]),
+                ),
+              ),
+        ],
+
+        // مشاركة ثانوية
+        const SectionTitle('مشاركة'),
+        OutlinedButton.icon(
+          onPressed: () => runBusy(context, 'جارٍ تجهيز النسخة…', () => _shareNow(store)),
+          icon: const Icon(Icons.send_rounded, size: 18),
+          label: const Text('إرسال نسخة الآن (واتساب / بريد)'),
         ),
       ]),
     );
   }
+
+  Future<void> _shareNow(Store store) async {
+    final json = store.exportJson();
+    final name = 'keif-backup-${Store.backupStamp()}.json';
+    await Share.shareXFiles([XFile.fromData(utf8.encode(json), mimeType: 'application/json', name: name)], subject: name);
+  }
+
+  Future<void> _restore(Store store, _BackupInfo b) async {
+    try {
+      final text = await FileService.readText(b.file.path);
+      if (!mounted) return;
+      await applyBackupImport(context, store, text, sourceName: '${_when(b.file.modified)} (${b.file.name})');
+    } catch (e) {
+      if (mounted) toast(context, 'تعذّر قراءة النسخة: $e', error: true);
+    }
+  }
+
+  static String _when(DateTime t) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${t.year}-${two(t.month)}-${two(t.day)}  ${two(t.hour)}:${two(t.minute)}';
+  }
+}
+
+class _BackupInfo {
+  final SavedFile file;
+  final Map<String, dynamic>? counts;
+  const _BackupInfo(this.file, this.counts);
 }
 
 /* ---------- دوال مساعدة مشتركة (القفل / الاسترجاع) ---------- */
@@ -495,29 +934,6 @@ Future<void> importBackupFromFile(BuildContext context, Store store) async {
     return;
   }
   await applyBackupImport(context, store, text, sourceName: f.name);
-}
-
-/// استرجاع بلصق النص (احتياطي)
-Future<void> importBackupByPaste(BuildContext context, Store store) async {
-  final ctl = TextEditingController();
-  final clip = await Clipboard.getData('text/plain');
-  if (clip?.text != null && clip!.text!.trim().startsWith('{')) ctl.text = clip.text!;
-  if (!context.mounted) return;
-  final ok = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('استرجاع بلصق النص'),
-      content: TextField(controller: ctl, maxLines: 8, style: const TextStyle(fontSize: 11, fontFamily: 'monospace'), decoration: const InputDecoration(hintText: 'الصق محتوى ملف النسخة هنا')),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('إلغاء')),
-        FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('استرجاع')),
-      ],
-    ),
-  );
-  final text = ctl.text;
-  ctl.dispose();
-  if (ok != true || !context.mounted) return;
-  await applyBackupImport(context, store, text);
 }
 
 Future<void> applyBackupImport(BuildContext context, Store store, String text, {String? sourceName}) async {

@@ -13,13 +13,15 @@ import 'doc_detail.dart';
 import 'doc_form.dart';
 
 class DocsScreen extends StatefulWidget {
-  const DocsScreen({super.key});
+  /// 0 = الفواتير، 1 = عروض الأسعار
+  final int initialTab;
+  const DocsScreen({super.key, this.initialTab = 0});
   @override
   State<DocsScreen> createState() => _DocsScreenState();
 }
 
 class _DocsScreenState extends State<DocsScreen> with SingleTickerProviderStateMixin {
-  late final _tabs = TabController(length: 2, vsync: this);
+  late final _tabs = TabController(length: 2, vsync: this, initialIndex: widget.initialTab);
   String _filter = 'all';
   String _q = '';
 
