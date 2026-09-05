@@ -327,10 +327,10 @@ class Store extends ChangeNotifier {
 
   /* ---------- الحساب / شاشة الدخول ---------- */
   /// هل اختار المستخدم طريقة الدخول (Google أو بدون تسجيل)؟
-  bool get signedIn => (_box.get('signedIn') as bool?) ?? false;
-  String get accountName => (_box.get('accountName') as String?) ?? '';
-  String get accountEmail => (_box.get('accountEmail') as String?) ?? '';
-  String get accountPhoto => (_box.get('accountPhoto') as String?) ?? '';
+  bool get signedIn => ready && ((_box.get('signedIn') as bool?) ?? false);
+  String get accountName => ready ? (_box.get('accountName') as String?) ?? '' : '';
+  String get accountEmail => ready ? (_box.get('accountEmail') as String?) ?? '' : '';
+  String get accountPhoto => ready ? (_box.get('accountPhoto') as String?) ?? '' : '';
   Future<void> setAccount({String name = '', String email = '', String photo = ''}) async {
     await _box.put('signedIn', true);
     await _box.put('accountName', name);
