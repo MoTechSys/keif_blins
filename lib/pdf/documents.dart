@@ -216,215 +216,115 @@ class DocPdf {
      ========================================================== */
   Future<Uint8List> statement(Statement s) async {
     final label = 'كشف حساب ${s.number}';
-    final invs = s.invoices;
-    // عنوان الفترة: شهر واحد → «أغسطس 2026»، غير ذلك → المدى
-    final monthRef = s.to.isNotEmpty ? s.to : (s.from.isNotEmpty ? s.from : s.issueDate);
-    final sameMonth = s.from.length >= 7 && s.to.length >= 7 && s.from.substring(0, 7) == s.to.substring(0, 7);
-    final periodTitle = sameMonth ? fmtMonth(monthRef) : (s.from.isEmpty && s.to.isEmpty ? 'كل الفترات' : fmtMonth(monthRef));
-    final periodText = s.from.isEmpty && s.to.isEmpty
+    final period = s.from.isEmpty && s.to.isEmpty
         ? 'كل الفترات'
-        : '${sameMonth ? '$periodTitle — ' : ''}من ${s.from.isEmpty ? 'البداية' : fmtDate(s.from)} حتى ${s.to.isEmpty ? fmtDate(s.issueDate) : fmtDate(s.to)}';
-    final services = invs.fold<int>(0, (v, i) => v + i.totals.services);
-    final external = invs.fold<int>(0, (v, i) => v + i.totals.external);
-    final discount = invs.fold<int>(0, (v, i) => v + i.totals.discount);
-    final vat = invs.fold<int>(0, (v, i) => v + i.totals.vat);
-    final hasExt = external > 0;
-    // أعمدة الخصم والضريبة تظهر فقط إن وُجدت في أي فاتورة، حتى يكون الإجمالي مفسَّرًا دائمًا
-    final hasDisc = discount > 0;
-    final hasVat = vat > 0;
-    final due = s.closing;
+        : 'من ${s.from.isEmpty ? 'البداية' : fmtDate(s.from)} إلى ${s.to.isEmpty ? fmtDate(s.issueDate) : fmtDate(s.to)}';
     final doc = _doc(label);
-
     String money(int h) => fmt(h, trimZeros: true);
+    String bal(int v) => v < 0 ? '(${money(-v)})' : money(v);
 
-    // الأعمدة الاختيارية (مشتريات/خصم/ضريبة) تُضاف قبل عمود الإجمالي بالترتيب
-    final extraCols = (hasExt ? 1 : 0) + (hasDisc ? 1 : 0) + (hasVat ? 1 : 0);
+    // الهيكلية الكلاسيكية لكشف الحساب: جدول واحد مدين/دائن/رصيد متجدد يبدأ برصيد افتتاحي
     final widths = <int, pw.TableColumnWidth>{
-      0: const pw.FixedColumnWidth(20), // م
-      1: const pw.FixedColumnWidth(47), // رقم الفاتورة
-      2: const pw.FixedColumnWidth(51), // تاريخ الإصدار
-      3: const pw.FixedColumnWidth(53), // تاريخ الفعالية
-      4: pw.FixedColumnWidth(extraCols >= 2 ? 46 : 57), // الموقع
-      5: const pw.FlexColumnWidth(), // البيان
-      6: const pw.FixedColumnWidth(38), // الفترات
-      7: pw.FixedColumnWidth(extraCols >= 2 ? 40 : 43), // السعر
-      for (var k = 0; k < extraCols; k++) 8 + k: pw.FixedColumnWidth(hasExt && k == 0 ? 50 : 40),
-      8 + extraCols: pw.FixedColumnWidth(extraCols >= 2 ? 52 : 58), // الإجمالي
+      0: const pw.FixedColumnWidth(24), // م
+      1: const pw.FixedColumnWidth(58), // التاريخ
+      2: const pw.FixedColumnWidth(66), // المرجع
+      3: const pw.FlexColumnWidth(), // البيان
+      4: const pw.FixedColumnWidth(74), // مدين
+      5: const pw.FixedColumnWidth(74), // دائن
+      6: const pw.FixedColumnWidth(80), // الرصيد
     };
     final rows = <pw.TableRow>[
       pw.TableRow(repeat: true, decoration: headDeco(), children: [
-        oth(a, 'م', size: 8.6),
-        oth(a, 'رقم\nالفاتورة', size: 8.6),
-        oth(a, 'تاريخ\nالإصدار', size: 8.6),
-        oth(a, 'تاريخ\nالفعالية', size: 8.6),
-        oth(a, 'الموقع', size: 8.6),
-        oth(a, 'البيان', size: 8.6),
-        oth(a, 'الفترات', size: 8.6),
-        oth(a, 'السعر', size: 8.6),
-        if (hasExt) oth(a, 'مشتريات\nخارجية', size: 8.6),
-        if (hasDisc) oth(a, 'الخصم', size: 8.6),
-        if (hasVat) oth(a, 'الضريبة', size: 8.6),
-        oth(a, 'الإجمالي\n(ر.س)', size: 8.6),
+        oth(a, 'م', size: 9),
+        oth(a, 'التاريخ', size: 9),
+        oth(a, 'المرجع', size: 9),
+        oth(a, 'البيان', size: 9),
+        oth(a, 'مدين\n(فواتير)', size: 9),
+        oth(a, 'دائن\n(دفعات)', size: 9),
+        oth(a, 'الرصيد\n(ر.س)', size: 9),
+      ]),
+      pw.TableRow(children: [
+        otd(a, '', size: 8.6, vPad: 7),
+        otd(a, s.from.isEmpty ? '' : fmtDate(s.from), size: 8.6, ltr: true, vPad: 7),
+        otd(a, '', size: 8.6, vPad: 7),
+        otd(a, s.from.isEmpty ? 'رصيد افتتاحي' : 'رصيد سابق قبل الفترة', align: pw.Alignment.centerRight, size: 8.6, bold: true, color: O.brown, vPad: 7),
+        otd(a, '', size: 8.6, vPad: 7),
+        otd(a, '', size: 8.6, vPad: 7),
+        otd(a, bal(s.opening), size: 8.6, ltr: true, bold: true, color: O.brown, vPad: 7),
       ]),
     ];
     var n = 0;
-    for (final i in invs) {
-      n++;
-      final qty = i.items.fold<double>(0, (v, li) => v + li.qty);
-      final price = i.items.length == 1 ? i.items.first.unitPrice : (qty > 0 ? (i.totals.services / qty).round() : i.totals.services);
-      final desc = i.items.map((li) => li.desc.split('\n').first.trim()).where((e) => e.isNotEmpty).join('، ');
-      rows.add(pw.TableRow(children: [
-        otd(a, '$n', size: 8.4, vPad: 7),
-        otd(a, i.number, size: 8.4, ltr: true, vPad: 7),
-        otd(a, fmtDate(i.issueDate), size: 8.4, ltr: true, vPad: 7),
-        otd(a, i.eventDate.isEmpty ? '—' : fmtDate(i.eventDate), size: 8.4, ltr: i.eventDate.isNotEmpty, vPad: 7),
-        otd(a, i.location.isEmpty ? '—' : i.location, size: 8.4, vPad: 7),
-        otd(a, desc.isEmpty ? 'خدمات ضيافة' : 'خدمات ضيافة: $desc', size: 8.4, vPad: 7),
-        otd(a, fmtQty(qty), size: 8.4, ltr: true, vPad: 7),
-        otd(a, money(price), size: 8.4, ltr: true, vPad: 7),
-        if (hasExt) otd(a, i.totals.external > 0 ? money(i.totals.external) : '—', size: 8.4, ltr: i.totals.external > 0, vPad: 7),
-        if (hasDisc) otd(a, i.totals.discount > 0 ? '- ${money(i.totals.discount)}' : '—', size: 8.4, ltr: i.totals.discount > 0, vPad: 7),
-        if (hasVat) otd(a, i.totals.vat > 0 ? money(i.totals.vat) : '—', size: 8.4, ltr: i.totals.vat > 0, vPad: 7),
-        otd(a, money(i.totals.total), size: 8.4, ltr: true, bold: true, vPad: 7),
-      ]));
-    }
-    if (invs.isEmpty) {
-      rows.add(pw.TableRow(children: [
-        for (var k = 0; k < 9 + extraCols; k++) k == 5 ? otd(a, 'لا توجد فواتير خلال الفترة', size: 8.6) : pw.SizedBox(),
-      ]));
-    }
-    final invoicesTotal = invs.fold<int>(0, (v, i) => v + i.totals.total);
-
-    // ── القسم الثاني: حركة الحساب (مدين/دائن/رصيد متجدد) ──
-    final ledgerWidths = <int, pw.TableColumnWidth>{
-      0: const pw.FixedColumnWidth(20), // م
-      1: const pw.FixedColumnWidth(56), // التاريخ
-      2: const pw.FixedColumnWidth(66), // المرجع
-      3: const pw.FlexColumnWidth(), // البيان
-      4: const pw.FixedColumnWidth(72), // مدين
-      5: const pw.FixedColumnWidth(72), // دائن
-      6: const pw.FixedColumnWidth(78), // الرصيد
-    };
-    String bal(int v) => v < 0 ? '(${money(-v)})' : money(v);
-    final ledger = <pw.TableRow>[
-      pw.TableRow(repeat: true, decoration: headDeco(), children: [
-        oth(a, 'م', size: 8.6),
-        oth(a, 'التاريخ', size: 8.6),
-        oth(a, 'المرجع', size: 8.6),
-        oth(a, 'البيان', size: 8.6),
-        oth(a, 'مدين\n(فواتير)', size: 8.6),
-        oth(a, 'دائن\n(مدفوعات)', size: 8.6),
-        oth(a, 'الرصيد\n(ر.س)', size: 8.6),
-      ]),
-      // الرصيد السابق يظهر دائمًا كأول سطر حتى يكون مبدأ الحساب واضحًا
-      pw.TableRow(children: [
-        otd(a, '—', size: 8.4, vPad: 7),
-        otd(a, s.from.isEmpty ? '—' : fmtDate(s.from), size: 8.4, ltr: s.from.isNotEmpty, vPad: 7),
-        otd(a, '—', size: 8.4, vPad: 7),
-        otd(a, s.from.isEmpty ? 'رصيد سابق (افتتاحي)' : 'رصيد سابق قبل الفترة', align: pw.Alignment.centerRight, size: 8.4, bold: true, vPad: 7),
-        otd(a, '—', size: 8.4, vPad: 7),
-        otd(a, '—', size: 8.4, vPad: 7),
-        otd(a, bal(s.opening), size: 8.4, ltr: true, bold: true, vPad: 7),
-      ]),
-    ];
-    var ln = 0;
     for (final r in s.rows) {
-      ln++;
+      n++;
       final isInv = r.type == 'invoice';
-      ledger.add(pw.TableRow(children: [
-        otd(a, '$ln', size: 8.4, vPad: 7),
-        otd(a, fmtDate(r.date), size: 8.4, ltr: true, vPad: 7),
-        otd(a, r.ref.isEmpty ? '—' : r.ref, size: 8.4, ltr: r.ref.isNotEmpty, vPad: 7),
-        otd(a, r.desc, align: pw.Alignment.centerRight, size: 8.4, vPad: 7),
-        otd(a, isInv ? money(r.debit) : '—', size: 8.4, ltr: isInv, vPad: 7),
-        otd(a, !isInv ? money(r.credit) : '—', size: 8.4, ltr: !isInv, vPad: 7),
-        otd(a, bal(r.balance), size: 8.4, ltr: true, bold: true, vPad: 7),
+      rows.add(pw.TableRow(children: [
+        otd(a, '$n', size: 8.6, vPad: 7),
+        otd(a, fmtDate(r.date), size: 8.6, ltr: true, vPad: 7),
+        otd(a, r.ref, size: 8.4, ltr: true, vPad: 7),
+        otd(a, r.desc, align: pw.Alignment.centerRight, size: 8.6, vPad: 7),
+        otd(a, isInv ? money(r.debit) : '', size: 8.6, ltr: true, vPad: 7),
+        otd(a, !isInv ? money(r.credit) : '', size: 8.6, ltr: true, vPad: 7),
+        otd(a, bal(r.balance), size: 8.6, ltr: true, bold: true, vPad: 7),
       ]));
     }
     if (s.rows.isEmpty) {
-      ledger.add(pw.TableRow(children: [
+      rows.add(pw.TableRow(children: [
         for (var k = 0; k < 7; k++) k == 3 ? otd(a, 'لا توجد حركات خلال الفترة', size: 8.6) : pw.SizedBox(),
       ]));
     }
-    // سطر الإجماليات في ذيل حركة الحساب
-    ledger.add(pw.TableRow(decoration: headDeco(), children: [
+    rows.add(pw.TableRow(decoration: headDeco(), children: [
       pw.SizedBox(),
       pw.SizedBox(),
       pw.SizedBox(),
-      otd(a, 'الإجمالي', align: pw.Alignment.centerRight, size: 8.6, bold: true, vPad: 7),
-      otd(a, money(s.billed), size: 8.6, ltr: true, bold: true, vPad: 7),
-      otd(a, money(s.paid), size: 8.6, ltr: true, bold: true, vPad: 7),
-      otd(a, bal(s.closing), size: 8.6, ltr: true, bold: true, vPad: 7),
+      otd(a, 'الإجمالي', align: pw.Alignment.centerRight, size: 9, bold: true, vPad: 7),
+      otd(a, money(s.billed), size: 9, ltr: true, bold: true, vPad: 7),
+      otd(a, money(s.paid), size: 9, ltr: true, bold: true, vPad: 7),
+      otd(a, bal(s.closing), size: 9, ltr: true, bold: true, vPad: 7),
     ]));
 
-    pw.Widget sectionTitle(String t, [String? hint]) => pw.Padding(
-          padding: const pw.EdgeInsets.only(bottom: 5),
-          child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
-            pw.Text(t, style: a.t(11, color: O.brown, black: true)),
-            if (hint != null) pw.SizedBox(width: 6),
-            if (hint != null) pw.Text(hint, style: a.t(8.6, color: O.brown)),
-          ]),
-        );
+    final due = s.closing;
+    final dueLabel = due > 0 ? 'الرصيد المستحق' : (due < 0 ? 'رصيد دائن للعميل' : 'الرصيد');
+    final badgeStatus = due > 0 ? 'مستحق: ${money(due)} ر.س' : (due < 0 ? 'دائن: ${money(-due)} ر.س' : 'لا مستحقات');
 
     doc.addPage(pw.MultiPage(
       pageTheme: officialPageTheme(a, org, leaves: true),
       header: (ctx) => pw.Padding(
         padding: const pw.EdgeInsets.only(bottom: 10),
-        child: officialHeader(a, org, badgeLines: ['كشف حساب', periodTitle]),
+        child: officialHeader(a, org, badgeLines: ['كشف حساب', badgeStatus]),
       ),
       footer: (ctx) => pw.Padding(
         padding: const pw.EdgeInsets.only(top: 8),
-        child: officialPageNum(a, ctx, prefix: periodTitle),
+        child: officialPageNum(a, ctx, prefix: '$label — ${s.client.name}'),
       ),
       build: (ctx) => [
         metaBlock(
           a,
-          size: 9,
+          size: 9.4,
           right: [
-            ('كشف حساب مُقدَّم إلى', s.client.name, false),
-            ('الفترة', periodText, false),
+            ('العميل', s.client.name, false),
+            ('جهة الاتصال', s.client.contact, false),
+            ('الهاتف', s.client.phone, true),
+            ('الرقم الضريبي', s.client.vatNumber, true),
           ],
           left: [
             ('رقم الكشف', s.number, true),
             ('تاريخ الإصدار', fmtDate(s.issueDate), true),
+            ('الفترة', period, false),
+            ('عدد الفواتير', '${s.count}', true),
           ],
         ),
         pw.SizedBox(height: 10),
-
-        // ── (1) تفصيل فواتير الفترة ──
-        sectionTitle('أولًا: تفصيل فواتير الفترة', '(${_countLabel(s.count)})'),
         officialTable(columnWidths: widths, children: rows),
-        pw.SizedBox(height: 6),
+        pw.SizedBox(height: 10),
+        // ملخص الحساب على يسار الصفحة (كالفاتورة)
         pw.Row(children: [
           pw.Spacer(),
           pw.SizedBox(
             width: 300,
             child: pw.Column(children: [
-              _soaLine('إجمالي خدمات الضيافة', '${money(services)} ر.س'),
-              if (hasExt) _soaLine('إجمالي المشتريات الخارجية', '${money(external)} ر.س'),
-              if (hasDisc) _soaLine('إجمالي الخصومات', '- ${money(discount)} ر.س'),
-              if (hasVat) _soaLine('إجمالي ضريبة القيمة المضافة', '${money(vat)} ر.س'),
-              _soaLine('إجمالي فواتير الفترة', '${money(invoicesTotal)} ر.س', bold: true),
-            ]),
-          ),
-        ]),
-        pw.SizedBox(height: 12),
-
-        // ── (2) حركة الحساب ──
-        sectionTitle('ثانيًا: حركة الحساب', '(رصيد سابق + فواتير − مدفوعات = الرصيد)'),
-        officialTable(columnWidths: ledgerWidths, children: ledger),
-        pw.SizedBox(height: 12),
-
-        // ── (3) ملخص الحساب: التسميات قرب المنتصف والقيم عند الهامش الأيسر (كالمرجع) ──
-        sectionTitle('ثالثًا: ملخص الحساب'),
-        pw.Row(children: [
-          pw.Spacer(),
-          pw.SizedBox(
-            width: 300,
-            child: pw.Column(children: [
-              _soaLine('رصيد سابق', '${bal(s.opening)} ر.س'),
-              _soaLine('فواتير الفترة (+)', '${money(s.billed)} ر.س'),
-              _soaLine('المدفوع خلال الفترة (−)', '${money(s.paid)} ر.س'),
+              _soaLine('الرصيد الافتتاحي', '${bal(s.opening)} ر.س'),
+              _soaLine('إجمالي الفواتير', '${money(s.billed)} ر.س'),
+              _soaLine('إجمالي المدفوعات', '${money(s.paid)} ر.س'),
             ]),
           ),
         ]),
@@ -439,16 +339,12 @@ class DocPdf {
           pw.SizedBox(
             width: 300,
             child: pw.Row(children: [
-              pw.Text(
-                due > 0 ? 'الرصيد المستحق عليكم' : (due < 0 ? 'رصيد دائن لصالحكم' : 'الرصيد'),
-                style: a.t(13.2, color: O.brown, black: true),
-              ),
+              pw.Text(dueLabel, style: a.t(13.2, color: O.brown, black: true)),
               pw.Spacer(),
-              pw.Text('${money(due.abs())} ر.س', style: a.t(13.2, color: due > 0 ? O.brown : O.ink, black: true)),
+              pw.Text('${money(due.abs())} ر.س', style: a.t(13.2, color: due > 0 ? O.red : O.brown, black: true)),
             ]),
           ),
         ]),
-        // التفقيط داخل كتلة الملخص اليسرى (كالمرجع) ثم خط فاصل بعرض الصفحة قبل التذييل
         if (org.showTafqit && due != 0) pw.SizedBox(height: 4),
         if (org.showTafqit && due != 0)
           pw.Row(children: [
@@ -458,15 +354,14 @@ class DocPdf {
               child: pw.Text(tafqit(due.abs()), style: a.t(10.6, color: O.ink, bold: true), textAlign: pw.TextAlign.right),
             ),
           ]),
-        if (due == 0) pw.SizedBox(height: 4),
-        if (due == 0)
-          pw.Row(children: [
-            pw.Spacer(),
-            pw.SizedBox(
-              width: 360,
-              child: pw.Text('حسابكم مسدَّد بالكامل حتى تاريخ هذا الكشف — نشكر لكم حسن تعاونكم.', style: a.t(9.6, color: O.ink), textAlign: pw.TextAlign.right),
-            ),
-          ]),
+        if (org.showTerms) pw.SizedBox(height: 8),
+        if (org.showTerms)
+          pw.Text(
+            due > 0
+                ? 'ملاحظة: نأمل تسوية الرصيد المستحق عبر التحويل البنكي على الحساب المذكور أدناه مع ذكر رقم الكشف. للاستفسار عن أي حركة يرجى التواصل معنا.'
+                : 'ملاحظة: حسابكم مسدَّد بالكامل حتى تاريخ هذا الكشف. نشكر لكم حسن تعاونكم.',
+            style: a.t(9.2, color: O.ink),
+          ),
         pw.SizedBox(height: 10),
         singleRule(),
         pw.SizedBox(height: 16),
@@ -475,13 +370,6 @@ class DocPdf {
     ));
     return doc.save();
   }
-
-  String _countLabel(int n) => switch (n) {
-        1 => 'فاتورة واحدة',
-        2 => 'فاتورتان',
-        _ when n >= 3 && n <= 10 => '$n فواتير',
-        _ => '$n فاتورة',
-      };
 
   pw.Widget _soaLine(String label, String value, {bool bold = false}) => pw.Padding(
         padding: const pw.EdgeInsets.only(bottom: 5),
