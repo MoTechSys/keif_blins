@@ -13,6 +13,7 @@ import '../../pdf/documents.dart';
 import '../preview_screen.dart';
 import '../theme.dart';
 import '../widgets.dart';
+import 'client_form.dart';
 import 'doc_form.dart';
 import 'payment_form.dart';
 
@@ -52,7 +53,7 @@ class DocDetail extends StatelessWidget {
                   await store.saveDoc(c);
                   if (context.mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => DocDetail(id: c.id)));
                 case 'del':
-                  if (await confirm(context, 'حذف ${isQ ? 'عرض السعر' : 'الفاتورة'}', 'سيُحذف المستند ${d.number} نهائيًا${isQ ? '' : ' مع الدفعات المرتبطة به'}.')) {
+                  if (await confirm(context, 'حذف ${isQ ? 'عرض السعر' : 'الفاتورة'}', 'سيُنقل المستند ${d.number} إلى سلة المحذوفات${isQ ? '' : ' مع الدفعات المرتبطة به'}، ويمكن استرجاعه خلال ${Store.trashDays} يومًا.')) {
                     await store.deleteDoc(d.id);
                     if (context.mounted) Navigator.pop(context);
                   }
@@ -60,7 +61,7 @@ class DocDetail extends StatelessWidget {
             },
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'dup', child: Text('نسخ كمستند جديد')),
-              PopupMenuItem(value: 'del', child: Text('حذف', style: TextStyle(color: C.red))),
+              PopupMenuItem(value: 'del', child: Text('نقل إلى سلة المحذوفات', style: TextStyle(color: C.red))),
             ],
           ),
         ],
@@ -86,6 +87,7 @@ class DocDetail extends StatelessWidget {
                 if (d.eventDate.isNotEmpty) 'المناسبة ${fmtDate(d.eventDate)}${d.eventDateTo.isNotEmpty && d.eventDateTo != d.eventDate ? ' → ${fmtDate(d.eventDateTo)}' : ''}',
                 if (d.location.isNotEmpty) d.location,
                 if (isQ && d.validUntil.isNotEmpty) 'ساري حتى ${fmtDate(d.validUntil)}',
+                if (d.isQuick) 'عرض سريع${d.quickPhone.trim().isNotEmpty ? ' • ${d.quickPhone.trim()}' : ''}',
               ].join(' • '),
               style: TextStyle(color: C.muted, fontSize: 12.5),
             ),
@@ -126,7 +128,7 @@ class DocDetail extends StatelessWidget {
               onPressed: () => runBusy(context, 'جارٍ تجهيز الملف…', () async {
                 final pdf = await DocPdf.create(store.org);
                 final bytes = await pdf.invoice(d, store.payments, client: client);
-                final name = '${ShareService.safeName(d.number)}.pdf';
+                final name = store.docFileName(d);
                 final msg = ShareService.invoiceMessage(d, store.org, store.payments);
                 // حفظ نسخة في مجلد الهاتف ثم مشاركة الملف المحفوظ مباشرة
                 final saved = await FileService.savePdf(bytes, d.isQuote ? FileKind.quote : FileKind.invoice, name, year: FileService.yearOf(d.issueDate));
@@ -144,14 +146,7 @@ class DocDetail extends StatelessWidget {
           if (isQ && d.quoteStatus != QuoteStatus.converted)
             Expanded(
               child: OutlinedButton.icon(
-                onPressed: () async {
-                  if (!await confirm(context, 'تحويل إلى فاتورة', 'سيتم إنشاء فاتورة جديدة بنفس البنود، ويُعلَّم العرض كمحوّل.', ok: 'تحويل', danger: false)) return;
-                  final inv = await store.convertQuote(d);
-                  if (context.mounted) {
-                    toast(context, 'تم إنشاء الفاتورة ${inv.number}');
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => DocDetail(id: inv.id)));
-                  }
-                },
+                onPressed: () => _convert(context, d, store),
                 icon: const Icon(Icons.swap_horiz_rounded, size: 18),
                 label: const Text('تحويل لفاتورة'),
               ),
@@ -205,7 +200,7 @@ class DocDetail extends StatelessWidget {
               child: Column(children: [
                 _sum('المجموع', fmt(t.subtotal)),
                 if (t.discount > 0) _sum('الخصم', '− ${fmt(t.discount)}', color: C.red),
-                _sum(t.vatRateBp > 0 ? 'الضريبة (${t.vatRateBp ~/ 100}%)' : 'الضريبة', t.vatRateBp > 0 ? fmt(t.vat) : 'معفاة'),
+                if (t.vatRateBp > 0) _sum('الضريبة (${t.vatRateBp ~/ 100}%)', fmt(t.vat)),
                 _sum(isQ ? 'إجمالي العرض' : 'الإجمالي المستحق', fmtSAR(t.total), strong: true),
                 if (!isQ && d.deposit > 0) _sum('العربون', fmt(d.deposit), color: C.green),
                 if (!isQ && pays.isNotEmpty) _sum('دفعات مسجّلة', fmt(paid - d.deposit), color: C.green),
@@ -245,6 +240,25 @@ class DocDetail extends StatelessWidget {
         ]),
       );
 
+  /// تحويل العرض إلى فاتورة — العرض السريع يستلزم إنشاء عميل أولًا (ملاحظة 10)
+  Future<void> _convert(BuildContext context, Invoice d, Store store) async {
+    String? clientId;
+    if (d.isQuick) {
+      final go = await confirm(context, 'تحويل إلى فاتورة', 'هذا عرض سريع بلا عميل مسجّل. سيُنشأ عميل جديد باسم «${store.docClientName(d)}» ${d.quickPhone.trim().isNotEmpty ? 'وجوال ${d.quickPhone.trim()} ' : ''}ثم تُنشأ الفاتورة باسمه.', ok: 'إنشاء العميل', danger: false);
+      if (!go || !context.mounted) return;
+      final c = await Navigator.push<Client>(context, MaterialPageRoute(builder: (_) => ClientForm(client: Client()..name = d.clientName.trim()..phone = d.quickPhone.trim())));
+      if (c == null || !context.mounted) return;
+      clientId = c.id;
+    } else {
+      if (!await confirm(context, 'تحويل إلى فاتورة', 'سيتم إنشاء فاتورة جديدة بنفس البنود، ويُعلَّم العرض كمحوّل.', ok: 'تحويل', danger: false)) return;
+    }
+    final inv = await store.convertQuote(d, clientId: clientId);
+    if (context.mounted) {
+      toast(context, 'تم إنشاء الفاتورة ${inv.number}');
+      Navigator.push(context, MaterialPageRoute(builder: (_) => DocDetail(id: inv.id)));
+    }
+  }
+
   void _preview(BuildContext context, Invoice d, Store store) {
     final label = d.isQuote ? 'عرض سعر ${d.number}' : 'فاتورة ${d.number}';
     Navigator.push(
@@ -252,7 +266,7 @@ class DocDetail extends StatelessWidget {
       MaterialPageRoute(
         builder: (_) => PreviewScreen(
           title: label,
-          fileName: '${ShareService.safeName(d.number)}.pdf',
+          fileName: store.docFileName(d),
           message: ShareService.invoiceMessage(d, store.org, store.payments),
           build: () async => (await DocPdf.create(store.org)).invoice(d, store.payments, client: store.client(d.clientId)),
           kind: d.isQuote ? FileKind.quote : FileKind.invoice,

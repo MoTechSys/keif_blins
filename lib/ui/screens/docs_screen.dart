@@ -43,7 +43,8 @@ class _DocsScreenState extends State<DocsScreen> with SingleTickerProviderStateM
         animation: _tabs,
         builder: (_, __) => FloatingActionButton.extended(
           onPressed: () {
-            if (store.clients.isEmpty) {
+            // عروض الأسعار تُسمح بلا عملاء (عرض سريع) — ملاحظة 10
+            if (_tabs.index == 0 && store.clients.isEmpty) {
               toast(context, 'أضف عميلًا أولًا', error: true);
               Navigator.push(context, MaterialPageRoute(builder: (_) => const ClientForm()));
               return;

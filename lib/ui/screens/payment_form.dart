@@ -65,7 +65,7 @@ class _PaymentFormState extends State<PaymentForm> {
             IconButton(
               icon: Icon(Icons.delete_outline, color: C.red),
               onPressed: () async {
-                if (await confirm(context, 'حذف الدفعة', 'سيُحذف السند ${p.receiptNumber} نهائيًا.')) {
+                if (await confirm(context, 'حذف الدفعة', 'سيُنقل السند ${p.receiptNumber} إلى سلة المحذوفات، ويمكن استرجاعه خلال ${Store.trashDays} يومًا.')) {
                   await store.deletePayment(p.id);
                   if (context.mounted) Navigator.pop(context);
                 }
@@ -178,7 +178,7 @@ class _PaymentFormState extends State<PaymentForm> {
         MaterialPageRoute(
           builder: (_) => PreviewScreen(
             title: 'سند قبض ${p.receiptNumber}',
-            fileName: '${ShareService.safeName(p.receiptNumber)}.pdf',
+            fileName: store.receiptFileName(p),
             message: ShareService.receiptMessage(p, c, store.org),
             build: () async => (await DocPdf.create(store.org)).receipt(p, c, inv),
             kind: FileKind.receipt,

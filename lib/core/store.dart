@@ -188,6 +188,22 @@ class Store extends ChangeNotifier {
   /// اسم العميل الظاهر في المستند (عميل مسجّل أو عرض سريع)
   String docClientName(Invoice d) => d.clientName.trim().isEmpty ? 'عميل' : d.clientName.trim();
 
+  /// أسماء ملفات المشاركة/الحفظ الموحّدة (ملاحظة 11د)
+  /// فاتورة INV-0005 - اسم العميل.pdf / عرض سعر QT-0001 - اسم العميل.pdf
+  String docFileName(Invoice d) => '${d.isQuote ? 'عرض سعر' : 'فاتورة'} ${d.number} - ${docClientName(d)}.pdf';
+
+  /// سند قبض REC-0001 - اسم العميل.pdf
+  String receiptFileName(Payment p) {
+    final c = client(p.clientId);
+    return 'سند قبض ${p.receiptNumber} - ${c?.name.trim().isNotEmpty == true ? c!.name.trim() : 'عميل'}.pdf';
+  }
+
+  /// كشف حساب - اسم العميل - التاريخ.pdf
+  String statementFileName(Client c, [String? date]) => 'كشف حساب - ${c.name.trim()} - ${date ?? todayISO()}.pdf';
+
+  /// إشعار تسليم - رقم الفاتورة - اسم العميل.pdf
+  String deliveryFileName(Invoice d) => 'إشعار تسليم - ${d.number} - ${docClientName(d)}.pdf';
+
   ClientSummary summary(Client c) => clientSummary(c, docs, payments);
 
   /// مؤشرات الرئيسية

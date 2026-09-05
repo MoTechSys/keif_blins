@@ -125,7 +125,7 @@ Future<void> openStatement(BuildContext context, Client c) async {
     MaterialPageRoute(
       builder: (_) => PreviewScreen(
         title: 'كشف حساب — ${c.name}',
-        fileName: '${ShareService.safeName(st.number)}.pdf',
+        fileName: store.statementFileName(c, st.issueDate),
         message: ShareService.statementMessage(st, store.org),
         build: () async => (await DocPdf.create(store.org)).statement(st),
         kind: FileKind.statement,
