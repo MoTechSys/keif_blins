@@ -15,7 +15,9 @@ class O {
   static const ink = PdfColor.fromInt(0xFF2B2118); // نص أساسي
   static const brown = PdfColor.fromInt(0xFF5B4232); // عناوين وتسميات
   static const gold = PdfColor.fromInt(0xFFB8894A); // خطوط وأرقام مميزة
-  static const red = PdfColor.fromInt(0xFFB3372E); // المتبقي
+  static const red = PdfColor.fromInt(0xFFB3372E); // المتبقي / المدين
+  static const green = PdfColor.fromInt(0xFF2E7D4F); // الدائن (المدفوعات)
+  static const zebra = PdfColor.fromInt(0xFFFAF5EC); // تظليل الصفوف المتناوبة
   static const headFill = PdfColor.fromInt(0xFFF0E3CC); // رأس الجدول
   static const line = PdfColor.fromInt(0xFFB5A386); // حدود الجدول (أوضح قليلاً)
   static const white = PdfColors.white;

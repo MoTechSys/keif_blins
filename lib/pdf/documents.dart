@@ -243,29 +243,34 @@ class DocPdf {
         oth(a, 'دائن\n(دفعات)', size: 9),
         oth(a, 'الرصيد\n(ر.س)', size: 9),
       ]),
-      pw.TableRow(children: [
-        otd(a, '', size: 8.6, vPad: 7),
-        otd(a, s.from.isEmpty ? '' : fmtDate(s.from), size: 8.6, ltr: true, vPad: 7),
-        otd(a, '', size: 8.6, vPad: 7),
-        otd(a, s.from.isEmpty ? 'رصيد افتتاحي' : 'رصيد سابق قبل الفترة', align: pw.Alignment.centerRight, size: 8.6, bold: true, color: O.brown, vPad: 7),
-        otd(a, '', size: 8.6, vPad: 7),
-        otd(a, '', size: 8.6, vPad: 7),
-        otd(a, bal(s.opening), size: 8.6, ltr: true, bold: true, color: O.brown, vPad: 7),
-      ]),
+      // سطر «رصيد سابق» يظهر فقط عند وجود رصيد مُرحَّل من قبل الفترة المختارة (وإلا يبدأ الكشف بالحركات مباشرة)
+      if (s.opening != 0)
+        pw.TableRow(decoration: const pw.BoxDecoration(color: O.headFill), children: [
+          otd(a, '', size: 8.6, vPad: 7),
+          otd(a, s.from.isEmpty ? '' : fmtDate(s.from), size: 8.6, ltr: true, vPad: 7),
+          otd(a, '', size: 8.6, vPad: 7),
+          otd(a, 'رصيد سابق قبل الفترة', align: pw.Alignment.centerRight, size: 8.6, bold: true, color: O.brown, vPad: 7),
+          otd(a, '', size: 8.6, vPad: 7),
+          otd(a, '', size: 8.6, vPad: 7),
+          otd(a, bal(s.opening), size: 8.6, ltr: true, bold: true, color: O.brown, vPad: 7),
+        ]),
     ];
     var n = 0;
     for (final r in s.rows) {
       n++;
       final isInv = r.type == 'invoice';
-      rows.add(pw.TableRow(children: [
-        otd(a, '$n', size: 8.6, vPad: 7),
-        otd(a, fmtDate(r.date), size: 8.6, ltr: true, vPad: 7),
-        otd(a, r.ref, size: 8.4, ltr: true, vPad: 7),
-        otd(a, r.desc, align: pw.Alignment.centerRight, size: 8.6, vPad: 7),
-        otd(a, isInv ? money(r.debit) : '', size: 8.6, ltr: true, vPad: 7),
-        otd(a, !isInv ? money(r.credit) : '', size: 8.6, ltr: true, vPad: 7),
-        otd(a, bal(r.balance), size: 8.6, ltr: true, bold: true, vPad: 7),
-      ]));
+      rows.add(pw.TableRow(
+        decoration: n.isEven ? const pw.BoxDecoration(color: O.zebra) : null,
+        children: [
+          otd(a, '$n', size: 8.6, vPad: 7),
+          otd(a, fmtDate(r.date), size: 8.6, ltr: true, vPad: 7),
+          otd(a, r.ref, size: 8.4, ltr: true, vPad: 7),
+          otd(a, r.desc, align: pw.Alignment.centerRight, size: 8.6, vPad: 7),
+          otd(a, isInv ? money(r.debit) : '', size: 8.6, ltr: true, color: O.red, vPad: 7),
+          otd(a, !isInv ? money(r.credit) : '', size: 8.6, ltr: true, color: O.green, bold: true, vPad: 7),
+          otd(a, bal(r.balance), size: 8.6, ltr: true, bold: true, vPad: 7),
+        ],
+      ));
     }
     if (s.rows.isEmpty) {
       rows.add(pw.TableRow(children: [
@@ -277,8 +282,8 @@ class DocPdf {
       pw.SizedBox(),
       pw.SizedBox(),
       otd(a, 'الإجمالي', align: pw.Alignment.centerRight, size: 9, bold: true, vPad: 7),
-      otd(a, money(s.billed), size: 9, ltr: true, bold: true, vPad: 7),
-      otd(a, money(s.paid), size: 9, ltr: true, bold: true, vPad: 7),
+      otd(a, money(s.billed), size: 9, ltr: true, bold: true, color: O.red, vPad: 7),
+      otd(a, money(s.paid), size: 9, ltr: true, bold: true, color: O.green, vPad: 7),
       otd(a, bal(s.closing), size: 9, ltr: true, bold: true, vPad: 7),
     ]));
 
@@ -322,7 +327,7 @@ class DocPdf {
           pw.SizedBox(
             width: 300,
             child: pw.Column(children: [
-              _soaLine('الرصيد الافتتاحي', '${bal(s.opening)} ر.س'),
+              if (s.opening != 0) _soaLine('رصيد سابق قبل الفترة', '${bal(s.opening)} ر.س'),
               _soaLine('إجمالي الفواتير', '${money(s.billed)} ر.س'),
               _soaLine('إجمالي المدفوعات', '${money(s.paid)} ر.س'),
             ]),
