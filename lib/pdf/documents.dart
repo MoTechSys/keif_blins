@@ -84,9 +84,9 @@ class DocPdf {
               (isQ ? 'رقم العرض' : 'رقم الفاتورة', inv.number),
               ('تاريخ الإصدار', fmtDate(inv.issueDate)),
               if (isQ) ('ساري حتى', fmtDate(inv.validUntil)),
-              ('تاريخ المناسبة', _eventRange(inv)),
-              ('الموقع', inv.location),
-              ('عدد الحضور', inv.attendees),
+              if (org.showEventBlock) ('تاريخ المناسبة', _eventRange(inv)),
+              if (org.showEventBlock) ('الموقع', inv.location),
+              if (org.showEventBlock) ('عدد الحضور', inv.attendees),
             ]),
           ),
         ]),
@@ -99,11 +99,11 @@ class DocPdf {
           pw.Expanded(
             flex: 11,
             child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              _tafqitBox(t.total),
-              pw.SizedBox(height: 2.5 * mm),
-              if ((isQ ? org.quoteTerms : inv.terms.isNotEmpty ? inv.terms : org.invoiceTerms).isNotEmpty)
+              if (org.showTafqit) _tafqitBox(t.total),
+              if (org.showTafqit) pw.SizedBox(height: 2.5 * mm),
+              if (org.showTerms && (inv.terms.isNotEmpty ? inv.terms : (isQ ? org.quoteTerms : org.invoiceTerms)).isNotEmpty)
                 _termsBox(isQ ? 'الشروط والأحكام' : 'ملاحظات وشروط',
-                    isQ ? (inv.terms.isNotEmpty ? inv.terms : org.quoteTerms) : (inv.terms.isNotEmpty ? inv.terms : org.invoiceTerms)),
+                    inv.terms.isNotEmpty ? inv.terms : (isQ ? org.quoteTerms : org.invoiceTerms)),
               if (inv.notes.isNotEmpty) pw.SizedBox(height: 2 * mm),
               if (inv.notes.isNotEmpty) _termsBox('ملاحظات', inv.notes),
             ]),
@@ -112,9 +112,9 @@ class DocPdf {
           pw.Expanded(flex: 9, child: _sumsCard(t, paid, remaining, isQ)),
         ]),
         pw.SizedBox(height: 4 * mm),
-        if (!isQ) _ackBlock(),
-        if (!isQ) pw.SizedBox(height: 3 * mm),
-        signatures(a, org, left: isQ ? 'اعتماد العميل' : 'توقيع العميل'),
+        if (!isQ && org.showAck) _ackBlock(),
+        if (!isQ && org.showAck) pw.SizedBox(height: 3 * mm),
+        if (org.showSignatures) signatures(a, org, left: isQ ? 'اعتماد العميل' : 'توقيع العميل'),
         pw.SizedBox(height: 2 * mm),
       ],
     ));
@@ -165,10 +165,10 @@ class DocPdf {
         children: [
           pw.Padding(padding: const pw.EdgeInsets.symmetric(vertical: 1.5 * mm), child: pw.Center(child: numCircle(a, n))),
           _descCell(li.desc),
-          td(a, fmt(li.unitPrice, trimZeros: true)),
+          td(a, fmt(li.unitPrice, trimZeros: true), ltr: true),
           td(a, '${fmtQty(li.qty)}${unit == 'الكمية' ? ' ${li.unitLabel}' : ''}'),
-          if (hasExt) td(a, li.external > 0 ? fmt(li.external, trimZeros: true) : '—', color: li.external > 0 ? K.ink : K.muted),
-          td(a, fmt(li.total), bold: true, color: K.navy),
+          if (hasExt) td(a, li.external > 0 ? fmt(li.external, trimZeros: true) : '—', color: li.external > 0 ? K.ink : K.muted, ltr: li.external > 0),
+          td(a, fmt(li.total), bold: true, color: K.navy, ltr: true),
         ],
       ));
     }
@@ -190,7 +190,7 @@ class DocPdf {
       child: pw.ClipRRect(
         horizontalRadius: 1.5 * mm,
         verticalRadius: 1.5 * mm,
-        child: pw.Table(columnWidths: widths, children: rows),
+        child: rtlTable(columnWidths: widths, children: rows),
       ),
     );
   }
@@ -225,7 +225,7 @@ class DocPdf {
         child: pw.Row(children: [
           pw.Text(l, style: a.t(strong ? 8.8 : 8, color: color ?? (strong ? K.navy : K.muted), bold: strong)),
           pw.Spacer(),
-          pw.Text(v, style: a.t(strong ? 9.5 : 8.4, color: color ?? K.ink, bold: true)),
+          pw.Text(v, style: a.t(strong ? 9.5 : 8.4, color: color ?? K.ink, bold: true), textDirection: pw.TextDirection.ltr),
         ]),
       );
 
@@ -245,7 +245,7 @@ class DocPdf {
           if (t.external > 0) _sumRow('المشتريات الخارجية', fmt(t.external)),
           _sumRow('المجموع', fmt(t.subtotal)),
           if (t.discount > 0) _sumRow('الخصم', '- ${fmt(t.discount)}', color: K.red),
-          _sumRow(t.vatRateBp > 0 ? 'ضريبة القيمة المضافة ($vatPct%)' : 'ضريبة القيمة المضافة', t.vatRateBp > 0 ? fmt(t.vat) : 'معفاة'),
+          if (t.vatRateBp > 0) _sumRow('ضريبة القيمة المضافة ($vatPct%)', fmt(t.vat)),
           // الإجمالي — شريط كحلي
           pw.Container(
             padding: const pw.EdgeInsets.symmetric(vertical: 2.2 * mm, horizontal: 3 * mm),
@@ -253,11 +253,11 @@ class DocPdf {
             child: pw.Row(children: [
               pw.Text(isQ ? 'إجمالي العرض' : 'الإجمالي المستحق', style: a.t(9.5, color: K.goldLight, bold: true)),
               pw.Spacer(),
-              pw.Text(fmtSAR(t.total), style: a.t(12, color: K.white, black: true)),
+              pw.Text(fmtSAR(t.total), style: a.t(12, color: K.white, black: true), textDirection: pw.TextDirection.ltr),
             ]),
           ),
-          if (!isQ && paid > 0) _sumRow('العربون / المدفوع', fmt(paid), color: K.green),
-          if (!isQ && paid > 0) _sumRow('المتبقي', fmtSAR(remaining), strong: true, color: remaining > 0 ? K.red : K.green, last: true),
+          if (!isQ && paid > 0 && org.showRemaining) _sumRow('العربون / المدفوع', fmt(paid), color: K.green),
+          if (!isQ && paid > 0 && org.showRemaining) _sumRow('المتبقي', fmtSAR(remaining), strong: true, color: remaining > 0 ? K.red : K.green, last: true),
         ]),
       ),
     );
@@ -330,7 +330,7 @@ class DocPdf {
         td(a, 'رصيد افتتاحي', align: pw.Alignment.centerRight, bold: true, color: K.navy),
         td(a, ''),
         td(a, ''),
-        td(a, fmt(s.opening), bold: true, color: K.navy),
+        td(a, fmt(s.opening), bold: true, color: K.navy, ltr: true),
       ]),
     ];
     var i = 0;
@@ -343,12 +343,12 @@ class DocPdf {
           border: const pw.Border(bottom: pw.BorderSide(color: K.line, width: 0.3)),
         ),
         children: [
-          td(a, fmtDate(r.date), size: 7.6),
+          td(a, fmtDate(r.date), size: 7.6, ltr: true),
           td(a, r.ref, size: 7.4, color: K.muted, ltr: true),
           td(a, r.desc, align: pw.Alignment.centerRight, size: 7.8),
-          td(a, isInv ? fmt(r.debit) : '', color: K.ink),
-          td(a, !isInv ? fmt(r.credit) : '', color: K.green),
-          td(a, fmt(r.balance), bold: true, color: r.balance > 0 ? K.navy : K.green),
+          td(a, isInv ? fmt(r.debit) : '', color: K.ink, ltr: true),
+          td(a, !isInv ? fmt(r.credit) : '', color: K.green, ltr: true),
+          td(a, fmt(r.balance), bold: true, color: r.balance > 0 ? K.navy : K.green, ltr: true),
         ],
       ));
     }
@@ -408,7 +408,7 @@ class DocPdf {
           child: pw.ClipRRect(
             horizontalRadius: 1.5 * mm,
             verticalRadius: 1.5 * mm,
-            child: pw.Table(
+            child: rtlTable(
               columnWidths: const {
                 0: pw.FixedColumnWidth(19 * mm),
                 1: pw.FixedColumnWidth(20 * mm),
@@ -426,9 +426,9 @@ class DocPdf {
           pw.Expanded(
             flex: 11,
             child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-              _tafqitBox(s.closing.abs()),
-              pw.SizedBox(height: 2 * mm),
-              _termsBox('ملاحظة', s.closing > 0
+              if (org.showTafqit) _tafqitBox(s.closing.abs()),
+              if (org.showTafqit) pw.SizedBox(height: 2 * mm),
+              if (org.showTerms) _termsBox('ملاحظة', s.closing > 0
                   ? 'نأمل تسوية الرصيد المستحق عبر التحويل البنكي على الحساب المذكور أدناه مع ذكر رقم الكشف. للاستفسار عن أي حركة يرجى التواصل معنا.'
                   : 'حسابكم مسدَّد بالكامل حتى تاريخ هذا الكشف. نشكر لكم حسن تعاونكم.'),
             ]),
@@ -451,7 +451,7 @@ class DocPdf {
                     child: pw.Row(children: [
                       pw.Text(s.closing >= 0 ? 'الرصيد المستحق' : 'رصيد دائن للعميل', style: a.t(9.5, color: K.goldLight, bold: true)),
                       pw.Spacer(),
-                      pw.Text(fmtSAR(s.closing.abs()), style: a.t(12, color: K.white, black: true)),
+                      pw.Text(fmtSAR(s.closing.abs()), style: a.t(12, color: K.white, black: true), textDirection: pw.TextDirection.ltr),
                     ]),
                   ),
                 ]),
@@ -460,7 +460,7 @@ class DocPdf {
           ),
         ]),
         pw.SizedBox(height: 4 * mm),
-        signatures(a, org, right: 'المحاسب / المدير العام', left: 'مصادقة العميل'),
+        if (org.showSignatures) signatures(a, org, right: 'المحاسب / المدير العام', left: 'مصادقة العميل'),
       ],
     ));
     return doc.save();
@@ -490,12 +490,12 @@ class DocPdf {
           child: pw.Row(children: [
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
               pw.Text('المبلغ المستلم', style: a.t(8.5, color: K.goldLight)),
-              pw.Text(fmtSAR(p.amount), style: a.t(20, color: K.white, black: true)),
+              pw.Text(fmtSAR(p.amount), style: a.t(20, color: K.white, black: true), textDirection: pw.TextDirection.ltr),
             ]),
             pw.Spacer(),
             pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
               pw.Text('التاريخ', style: a.t(8, color: K.goldLight)),
-              pw.Text(fmtDate(p.date), style: a.t(11, color: K.white, bold: true)),
+              pw.Text(fmtDate(p.date), style: a.t(11, color: K.white, bold: true), textDirection: pw.TextDirection.ltr),
               pw.SizedBox(height: 1 * mm),
               pw.Text('طريقة الدفع', style: a.t(8, color: K.goldLight)),
               pw.Text(p.method, style: a.t(10, color: K.white, bold: true)),
@@ -505,7 +505,7 @@ class DocPdf {
         pw.SizedBox(height: 4 * mm),
         dataCard(a, title: 'تفاصيل السند', rows: [
           ('استلمنا من', c.name),
-          ('مبلغًا وقدره', tafqit(p.amount)),
+          if (org.showTafqit) ('مبلغًا وقدره', tafqit(p.amount)),
           ('وذلك عن', inv != null ? 'فاتورة رقم ${inv.number}${inv.eventDate.isNotEmpty ? ' — ${fmtDate(inv.eventDate)}' : ''}' : 'دفعة على الحساب'),
           ('رقم العملية / المرجع', p.reference),
           ('ملاحظات', p.notes),
@@ -513,8 +513,8 @@ class DocPdf {
         pw.SizedBox(height: 4 * mm),
         if (inv != null) _receiptInvoiceState(inv, p),
         pw.Spacer(),
-        signatures(a, org, right: 'المستلم / المدير العام', left: 'توقيع الدافع'),
-        pw.SizedBox(height: 4 * mm),
+        if (org.showSignatures) signatures(a, org, right: 'المستلم / المدير العام', left: 'توقيع الدافع'),
+        if (org.showSignatures) pw.SizedBox(height: 4 * mm),
         royalFooter(a, org),
         pageNum(a, ctx, '$label — ${c.name}'),
       ]),
@@ -536,6 +536,6 @@ class DocPdf {
 
   pw.Widget _kv(String k, String v, {PdfColor color = K.navy}) => pw.Column(children: [
         pw.Text(k, style: a.t(7.2, color: K.muted)),
-        pw.Text(v, style: a.t(10, color: color, bold: true)),
+        pw.Text(v, style: a.t(10, color: color, bold: true), textDirection: pw.TextDirection.ltr),
       ]);
 }

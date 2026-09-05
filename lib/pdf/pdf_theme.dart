@@ -193,9 +193,9 @@ pw.Widget royalHeader(PdfAssets a, Org org) {
           pw.Text(org.nameEn, style: pw.TextStyle(font: a.bold, fontSize: 8, color: K.goldDark, letterSpacing: 1.2)),
           pw.SizedBox(height: 1.2 * mm),
           pw.Row(children: [
-            _pill(a, 'س.ت', org.cr),
-            if (org.vat.isNotEmpty) pw.SizedBox(width: 2 * mm),
-            if (org.vat.isNotEmpty) _pill(a, 'الرقم الضريبي', org.vat),
+            if (org.showCr && org.cr.isNotEmpty) _pill(a, 'س.ت', org.cr),
+            if (org.showCr && org.cr.isNotEmpty && org.showVatNumber && org.vat.isNotEmpty) pw.SizedBox(width: 2 * mm),
+            if (org.showVatNumber && org.vat.isNotEmpty) _pill(a, 'الرقم الضريبي', org.vat),
           ]),
         ]),
       ),
@@ -335,53 +335,81 @@ pw.Widget td(PdfAssets a, String t,
       child: pw.Text(t, style: a.t(size, color: color, bold: bold), textDirection: ltr ? pw.TextDirection.ltr : null),
     );
 
+/// جدول يبدأ من اليمين (ملاحظة 6): pw.Table لا يحترم اتجاه RTL،
+/// لذا نعكس ترتيب الخلايا وأعرض الأعمدة يدويًا ليصبح العمود الأول أقصى اليمين.
+pw.Table rtlTable({required Map<int, pw.TableColumnWidth> columnWidths, required List<pw.TableRow> children}) {
+  if (children.isEmpty) return pw.Table(columnWidths: columnWidths, children: children);
+  final n = children.first.children.length;
+  final widths = <int, pw.TableColumnWidth>{};
+  columnWidths.forEach((k, v) => widths[n - 1 - k] = v);
+  return pw.Table(
+    columnWidths: widths,
+    children: [
+      for (final r in children)
+        pw.TableRow(
+          children: r.children.reversed.toList(),
+          decoration: r.decoration,
+          repeat: r.repeat,
+          verticalAlignment: r.verticalAlignment,
+        ),
+    ],
+  );
+}
+
 /* ---------- كتلة التذييل الكحلية ---------- */
+/// التذييل: سطر بنكي واضح (رقم الحساب + IBAN) ثم سطر التواصل. خطوط مقروءة 8.5–9.5pt.
+/// لا يظهر إلا ما فُعِّل في «إعدادات الفواتير» (showBank / showCr).
 pw.Widget royalFooter(PdfAssets a, Org org, {bool bank = true}) {
+  final showBank = bank && org.showBank && (org.bankAccount.isNotEmpty || org.iban.isNotEmpty);
+  final contacts = <(String, String)>[
+    if (org.phone.isNotEmpty) ('الهاتف', org.phone),
+    if (org.website.isNotEmpty) ('الموقع', org.website),
+    if (org.email.isNotEmpty) ('البريد', org.email),
+    if (org.showCr && org.cr.isNotEmpty) ('س.ت', org.cr),
+  ];
   return pw.Container(
     decoration: pw.BoxDecoration(
       gradient: const pw.LinearGradient(colors: [K.navyDeep, K.navy]),
       borderRadius: pw.BorderRadius.circular(2 * mm),
       border: pw.Border.all(color: K.gold, width: 0.4),
     ),
-    padding: const pw.EdgeInsets.symmetric(horizontal: 4 * mm, vertical: 2.2 * mm),
+    padding: const pw.EdgeInsets.symmetric(horizontal: 4 * mm, vertical: 2.4 * mm),
     child: pw.Column(children: [
-      if (bank)
+      if (showBank)
         pw.Row(children: [
-          pw.Text('للتحويل البنكي  ', style: a.t(7.5, color: K.goldLight, bold: true)),
-          pw.Text(org.bankName, style: a.t(7.8, color: K.white)),
-          pw.SizedBox(width: 3 * mm),
-          pw.Text('IBAN ', style: a.t(7, color: K.goldLight)),
-          pw.Text(org.ibanSpaced, style: pw.TextStyle(font: a.bold, fontSize: 8.2, color: K.white, letterSpacing: 0.5), textDirection: pw.TextDirection.ltr),
+          if (org.bankAccount.isNotEmpty) ...[
+            pw.Text('رقم الحساب لدى ${org.bankName}  ', style: a.t(8.6, color: K.goldLight, bold: true)),
+            pw.Text(org.bankAccount, style: pw.TextStyle(font: a.bold, fontSize: 9.6, color: K.white, letterSpacing: 0.4), textDirection: pw.TextDirection.ltr),
+          ],
           pw.Spacer(),
-          pw.Text('رقم الحساب ', style: a.t(7, color: K.goldLight)),
-          pw.Text(org.bankAccount, style: a.t(7.8, color: K.white, bold: true), textDirection: pw.TextDirection.ltr),
+          if (org.iban.isNotEmpty) ...[
+            pw.Text('   IBAN', style: pw.TextStyle(font: a.bold, fontSize: 8.6, color: K.goldLight), textDirection: pw.TextDirection.ltr),
+            pw.Text(org.ibanSpaced, style: pw.TextStyle(font: a.bold, fontSize: 9.6, color: K.white, letterSpacing: 0.5), textDirection: pw.TextDirection.ltr),
+          ],
         ]),
-      if (bank) pw.SizedBox(height: 1.5 * mm),
-      if (bank) pw.Container(height: 0.3, color: K.gold),
-      if (bank) pw.SizedBox(height: 1.5 * mm),
+      if (showBank) pw.SizedBox(height: 1.8 * mm),
+      if (showBank) pw.Container(height: 0.3, color: K.gold),
+      if (showBank) pw.SizedBox(height: 1.8 * mm),
       pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-        _fcol(a, 'الهاتف', org.phone),
-        _fcol(a, 'الموقع', org.website),
-        _fcol(a, 'البريد', org.email),
-        _fcol(a, 'س.ت', org.cr),
+        for (final c in contacts) _fcol(a, c.$1, c.$2),
       ]),
     ]),
   );
 }
 
 pw.Widget _fcol(PdfAssets a, String l, String v) => pw.Row(mainAxisSize: pw.MainAxisSize.min, children: [
-      pw.Container(width: 1.4 * mm, height: 1.4 * mm, decoration: const pw.BoxDecoration(color: K.gold, shape: pw.BoxShape.circle)),
+      pw.Container(width: 1.5 * mm, height: 1.5 * mm, decoration: const pw.BoxDecoration(color: K.gold, shape: pw.BoxShape.circle)),
       pw.SizedBox(width: 1.5 * mm),
-      pw.Text('$l  ', style: a.t(6.8, color: K.goldLight)),
-      pw.Text(v, style: a.t(7.6, color: K.white), textDirection: pw.TextDirection.ltr),
+      pw.Text('$l  ', style: a.t(8, color: K.goldLight)),
+      pw.Text(v, style: a.t(8.8, color: K.white, bold: true), textDirection: pw.TextDirection.ltr),
     ]);
 
 /// سطر ترقيم الصفحات
 pw.Widget pageNum(PdfAssets a, pw.Context ctx, String docLabel) => pw.Padding(
       padding: const pw.EdgeInsets.only(top: 1.5 * mm),
       child: pw.Row(mainAxisAlignment: pw.MainAxisAlignment.spaceBetween, children: [
-        pw.Text(docLabel, style: a.t(6.8, color: K.muted)),
-        pw.Text('صفحة ${ctx.pageNumber} من ${ctx.pagesCount}', style: a.t(6.8, color: K.muted)),
+        pw.Text(docLabel, style: a.t(7.6, color: K.muted)),
+        pw.Text('صفحة ${ctx.pageNumber} من ${ctx.pagesCount}', style: a.t(7.6, color: K.muted)),
       ]),
     );
 
