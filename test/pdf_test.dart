@@ -67,13 +67,24 @@ void main() {
           vatRateBp: i % 3 == 0 ? 1500 : 0, discount: i % 5 == 0 ? 10000 : 0));
       if (i.isEven) ps.add(Payment(id: 'p$i', clientId: 'c1', invoiceId: 'x$i', amount: 50000 * i, date: d, receiptNumber: 'REC-${i.toString().padLeft(4, '0')}'));
     }
+    // دفعة على الحساب (غير مرتبطة بفاتورة) لاختبار ظهورها في حركة الحساب
+    ps.add(Payment(id: 'p-acc', clientId: 'c1', invoiceId: '', amount: 250000, date: '2026-06-15', method: 'نقدًا', receiptNumber: 'REC-0100'));
     final s = buildStatement(client: client, invoices: docs, payments: ps, number: 'SOA-202608-001');
     expect(s.rows.length, greaterThanOrEqualTo(45), reason: 'المسودات فقط تُستبعد؛ المرسَلة تظهر');
+    // معادلة الكشف: رصيد سابق + فواتير − مدفوعات = الرصيد
+    expect(s.closing, s.opening + s.billed - s.paid);
+    expect(s.rows.last.balance, s.closing);
     final pdf = await DocPdf.create(org);
     final bytes = await pdf.statement(s);
     expect(bytes.length, greaterThan(20000));
     expect(RegExp(r'/Type\s*/Page[^s]').allMatches(String.fromCharCodes(bytes)).length, greaterThanOrEqualTo(2), reason: 'multi-page');
     await save('statement.pdf', bytes);
+
+    // كشف لفترة محددة برصيد سابق: يجب أن يُرحَّل ما قبل الفترة إلى «رصيد سابق»
+    final s2 = buildStatement(client: client, invoices: docs, payments: ps, from: '2026-07-01', to: '2026-09-30', number: 'SOA-202609-002');
+    expect(s2.opening, isNot(0), reason: 'حركات ما قبل يوليو تُرحَّل كرصيد سابق');
+    expect(s2.closing, s2.opening + s2.billed - s2.paid);
+    await save('statement_period.pdf', await pdf.statement(s2));
   });
 
   test('receipt PDF renders', () async {

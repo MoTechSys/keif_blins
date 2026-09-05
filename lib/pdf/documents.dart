@@ -293,6 +293,78 @@ class DocPdf {
         for (var k = 0; k < 9 + extraCols; k++) k == 5 ? otd(a, 'لا توجد فواتير خلال الفترة', size: 8.6) : pw.SizedBox(),
       ]));
     }
+    final invoicesTotal = invs.fold<int>(0, (v, i) => v + i.totals.total);
+
+    // ── القسم الثاني: حركة الحساب (مدين/دائن/رصيد متجدد) ──
+    final ledgerWidths = <int, pw.TableColumnWidth>{
+      0: const pw.FixedColumnWidth(20), // م
+      1: const pw.FixedColumnWidth(56), // التاريخ
+      2: const pw.FixedColumnWidth(66), // المرجع
+      3: const pw.FlexColumnWidth(), // البيان
+      4: const pw.FixedColumnWidth(72), // مدين
+      5: const pw.FixedColumnWidth(72), // دائن
+      6: const pw.FixedColumnWidth(78), // الرصيد
+    };
+    String bal(int v) => v < 0 ? '(${money(-v)})' : money(v);
+    final ledger = <pw.TableRow>[
+      pw.TableRow(repeat: true, decoration: headDeco(), children: [
+        oth(a, 'م', size: 8.6),
+        oth(a, 'التاريخ', size: 8.6),
+        oth(a, 'المرجع', size: 8.6),
+        oth(a, 'البيان', size: 8.6),
+        oth(a, 'مدين\n(فواتير)', size: 8.6),
+        oth(a, 'دائن\n(مدفوعات)', size: 8.6),
+        oth(a, 'الرصيد\n(ر.س)', size: 8.6),
+      ]),
+      // الرصيد السابق يظهر دائمًا كأول سطر حتى يكون مبدأ الحساب واضحًا
+      pw.TableRow(children: [
+        otd(a, '—', size: 8.4, vPad: 7),
+        otd(a, s.from.isEmpty ? '—' : fmtDate(s.from), size: 8.4, ltr: s.from.isNotEmpty, vPad: 7),
+        otd(a, '—', size: 8.4, vPad: 7),
+        otd(a, s.from.isEmpty ? 'رصيد سابق (افتتاحي)' : 'رصيد سابق قبل الفترة', align: pw.Alignment.centerRight, size: 8.4, bold: true, vPad: 7),
+        otd(a, '—', size: 8.4, vPad: 7),
+        otd(a, '—', size: 8.4, vPad: 7),
+        otd(a, bal(s.opening), size: 8.4, ltr: true, bold: true, vPad: 7),
+      ]),
+    ];
+    var ln = 0;
+    for (final r in s.rows) {
+      ln++;
+      final isInv = r.type == 'invoice';
+      ledger.add(pw.TableRow(children: [
+        otd(a, '$ln', size: 8.4, vPad: 7),
+        otd(a, fmtDate(r.date), size: 8.4, ltr: true, vPad: 7),
+        otd(a, r.ref.isEmpty ? '—' : r.ref, size: 8.4, ltr: r.ref.isNotEmpty, vPad: 7),
+        otd(a, r.desc, align: pw.Alignment.centerRight, size: 8.4, vPad: 7),
+        otd(a, isInv ? money(r.debit) : '—', size: 8.4, ltr: isInv, vPad: 7),
+        otd(a, !isInv ? money(r.credit) : '—', size: 8.4, ltr: !isInv, vPad: 7),
+        otd(a, bal(r.balance), size: 8.4, ltr: true, bold: true, vPad: 7),
+      ]));
+    }
+    if (s.rows.isEmpty) {
+      ledger.add(pw.TableRow(children: [
+        for (var k = 0; k < 7; k++) k == 3 ? otd(a, 'لا توجد حركات خلال الفترة', size: 8.6) : pw.SizedBox(),
+      ]));
+    }
+    // سطر الإجماليات في ذيل حركة الحساب
+    ledger.add(pw.TableRow(decoration: headDeco(), children: [
+      pw.SizedBox(),
+      pw.SizedBox(),
+      pw.SizedBox(),
+      otd(a, 'الإجمالي', align: pw.Alignment.centerRight, size: 8.6, bold: true, vPad: 7),
+      otd(a, money(s.billed), size: 8.6, ltr: true, bold: true, vPad: 7),
+      otd(a, money(s.paid), size: 8.6, ltr: true, bold: true, vPad: 7),
+      otd(a, bal(s.closing), size: 8.6, ltr: true, bold: true, vPad: 7),
+    ]));
+
+    pw.Widget sectionTitle(String t, [String? hint]) => pw.Padding(
+          padding: const pw.EdgeInsets.only(bottom: 5),
+          child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+            pw.Text(t, style: a.t(11, color: O.brown, black: true)),
+            if (hint != null) pw.SizedBox(width: 6),
+            if (hint != null) pw.Text(hint, style: a.t(8.6, color: O.brown)),
+          ]),
+        );
 
     doc.addPage(pw.MultiPage(
       pageTheme: officialPageTheme(a, org, leaves: true),
@@ -317,10 +389,12 @@ class DocPdf {
             ('تاريخ الإصدار', fmtDate(s.issueDate), true),
           ],
         ),
-        pw.SizedBox(height: 8),
+        pw.SizedBox(height: 10),
+
+        // ── (1) تفصيل فواتير الفترة ──
+        sectionTitle('أولًا: تفصيل فواتير الفترة', '(${_countLabel(s.count)})'),
         officialTable(columnWidths: widths, children: rows),
-        pw.SizedBox(height: 8),
-        // الإجماليات: التسميات قرب منتصف الصفحة والقيم عند الهامش الأيسر (كالمرجع)
+        pw.SizedBox(height: 6),
         pw.Row(children: [
           pw.Spacer(),
           pw.SizedBox(
@@ -330,8 +404,27 @@ class DocPdf {
               if (hasExt) _soaLine('إجمالي المشتريات الخارجية', '${money(external)} ر.س'),
               if (hasDisc) _soaLine('إجمالي الخصومات', '- ${money(discount)} ر.س'),
               if (hasVat) _soaLine('إجمالي ضريبة القيمة المضافة', '${money(vat)} ر.س'),
-              if (s.opening != 0) _soaLine('رصيد سابق قبل الفترة', '${money(s.opening)} ر.س'),
-              if (s.paid > 0) _soaLine('المدفوع خلال الفترة', '${money(s.paid)} ر.س'),
+              _soaLine('إجمالي فواتير الفترة', '${money(invoicesTotal)} ر.س', bold: true),
+            ]),
+          ),
+        ]),
+        pw.SizedBox(height: 12),
+
+        // ── (2) حركة الحساب ──
+        sectionTitle('ثانيًا: حركة الحساب', '(رصيد سابق + فواتير − مدفوعات = الرصيد)'),
+        officialTable(columnWidths: ledgerWidths, children: ledger),
+        pw.SizedBox(height: 12),
+
+        // ── (3) ملخص الحساب: التسميات قرب المنتصف والقيم عند الهامش الأيسر (كالمرجع) ──
+        sectionTitle('ثالثًا: ملخص الحساب'),
+        pw.Row(children: [
+          pw.Spacer(),
+          pw.SizedBox(
+            width: 300,
+            child: pw.Column(children: [
+              _soaLine('رصيد سابق', '${bal(s.opening)} ر.س'),
+              _soaLine('فواتير الفترة (+)', '${money(s.billed)} ر.س'),
+              _soaLine('المدفوع خلال الفترة (−)', '${money(s.paid)} ر.س'),
             ]),
           ),
         ]),
@@ -346,20 +439,32 @@ class DocPdf {
           pw.SizedBox(
             width: 300,
             child: pw.Row(children: [
-              pw.Text('الإجمالي المستحق – ${_countLabel(s.count)}', style: a.t(13.2, color: O.brown, black: true)),
+              pw.Text(
+                due > 0 ? 'الرصيد المستحق عليكم' : (due < 0 ? 'رصيد دائن لصالحكم' : 'الرصيد'),
+                style: a.t(13.2, color: O.brown, black: true),
+              ),
               pw.Spacer(),
-              pw.Text('${money(due)} ر.س', style: a.t(13.2, color: O.brown, black: true)),
+              pw.Text('${money(due.abs())} ر.س', style: a.t(13.2, color: due > 0 ? O.brown : O.ink, black: true)),
             ]),
           ),
         ]),
-        // التفقيط داخل كتلة الإجماليات اليسرى (كالمرجع) ثم خط فاصل بعرض الصفحة قبل التذييل
-        if (org.showTafqit && due > 0) pw.SizedBox(height: 4),
-        if (org.showTafqit && due > 0)
+        // التفقيط داخل كتلة الملخص اليسرى (كالمرجع) ثم خط فاصل بعرض الصفحة قبل التذييل
+        if (org.showTafqit && due != 0) pw.SizedBox(height: 4),
+        if (org.showTafqit && due != 0)
           pw.Row(children: [
             pw.Spacer(),
             pw.SizedBox(
               width: 360,
-              child: pw.Text(tafqit(due), style: a.t(10.6, color: O.ink, bold: true), textAlign: pw.TextAlign.right),
+              child: pw.Text(tafqit(due.abs()), style: a.t(10.6, color: O.ink, bold: true), textAlign: pw.TextAlign.right),
+            ),
+          ]),
+        if (due == 0) pw.SizedBox(height: 4),
+        if (due == 0)
+          pw.Row(children: [
+            pw.Spacer(),
+            pw.SizedBox(
+              width: 360,
+              child: pw.Text('حسابكم مسدَّد بالكامل حتى تاريخ هذا الكشف — نشكر لكم حسن تعاونكم.', style: a.t(9.6, color: O.ink), textAlign: pw.TextAlign.right),
             ),
           ]),
         pw.SizedBox(height: 10),
@@ -378,12 +483,12 @@ class DocPdf {
         _ => '$n فاتورة',
       };
 
-  pw.Widget _soaLine(String label, String value) => pw.Padding(
+  pw.Widget _soaLine(String label, String value, {bool bold = false}) => pw.Padding(
         padding: const pw.EdgeInsets.only(bottom: 5),
         child: pw.Row(children: [
-          pw.Text(label, style: a.t(9.6, color: O.ink)),
+          pw.Text(label, style: a.t(9.6, color: O.ink, bold: bold)),
           pw.Spacer(),
-          pw.Text(value, style: a.t(9.6, color: O.ink)),
+          pw.Text(value, style: a.t(9.6, color: O.ink, bold: bold)),
         ]),
       );
 

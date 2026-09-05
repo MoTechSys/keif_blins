@@ -66,15 +66,19 @@ class ShareService {
       ..writeln()
       ..writeln('مرفق كشف حساب رقم *${s.number}* من *${org.name}*')
       ..writeln('تاريخ الإصدار: ${fmtDate(s.issueDate)}')
-      ..writeln('عدد الفواتير: ${s.count}')
-      ..writeln('إجمالي الفواتير: ${fmtSAR(s.billed)}')
-      ..writeln('إجمالي المدفوعات: ${fmtSAR(s.paid)}');
+      ..writeln('عدد الفواتير: ${s.count}');
+    if (s.opening != 0) b.writeln('رصيد سابق: ${fmtSAR(s.opening)}');
+    b
+      ..writeln('فواتير الفترة: ${fmtSAR(s.billed)}')
+      ..writeln('المدفوع: ${fmtSAR(s.paid)}');
     if (s.closing > 0) {
       b
         ..writeln('الرصيد المستحق: *${fmtSAR(s.closing)}*')
         ..writeln()
         ..writeln('للتحويل: ${org.bankName}')
         ..writeln('IBAN: ${org.iban}');
+    } else if (s.closing < 0) {
+      b.writeln('رصيد دائن لصالحكم: *${fmtSAR(-s.closing)}*');
     } else {
       b.writeln('الحساب مسدَّد بالكامل — شكرًا لكم.');
     }
