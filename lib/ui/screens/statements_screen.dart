@@ -37,7 +37,7 @@ class StatementsScreen extends StatelessWidget {
                     child: Row(children: [
                       Icon(Icons.info_outline, color: C.gold, size: 20),
                       const SizedBox(width: 10),
-                      Expanded(child: Text('اختر عميلًا لإصدار كشف حساب فاخر بالفترة التي تريدها (هذا الشهر، الشهر الماضي، الكل، أو مخصصة).', style: TextStyle(color: C.text, fontSize: 13))),
+                      Expanded(child: Text('اختر عميلًا لإصدار كشف حساب (مختصر أو تفصيلي) بالفترة التي تريدها: هذا الشهر، الشهر الماضي، الكل، أو مخصصة.', style: TextStyle(color: C.text, fontSize: 13))),
                     ]),
                   );
                 }
@@ -70,6 +70,7 @@ class StatementsScreen extends StatelessWidget {
 Future<void> openStatement(BuildContext context, Client c) async {
   final store = context.read<Store>();
   var preset = 'all';
+  var detailed = false;
   var from = '';
   var to = '';
   final now = DateTime.now();
@@ -111,6 +112,13 @@ Future<void> openStatement(BuildContext context, Client c) async {
               Expanded(child: _DateBtn('إلى', to, (v) => setS(() => to = v))),
             ]),
           ],
+          const SizedBox(height: 14),
+          Text('نوع الكشف', style: TextStyle(color: C.muted, fontSize: 12, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 8),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            ChoiceChip(label: const Text('مختصر (مدين / دائن / رصيد)'), selected: !detailed, showCheckmark: false, onSelected: (_) => setS(() => detailed = false)),
+            ChoiceChip(label: const Text('تفصيلي (بنود كل فاتورة ودفعاتها)'), selected: detailed, showCheckmark: false, onSelected: (_) => setS(() => detailed = true)),
+          ]),
           const SizedBox(height: 16),
           FilledButton.icon(onPressed: () => Navigator.pop(ctx, true), icon: const Icon(Icons.picture_as_pdf_rounded), label: const Text('إصدار الكشف')),
         ]),
@@ -124,10 +132,12 @@ Future<void> openStatement(BuildContext context, Client c) async {
     context,
     MaterialPageRoute(
       builder: (_) => PreviewScreen(
-        title: 'كشف حساب — ${c.name}',
-        fileName: store.statementFileName(c, st.issueDate),
+        title: '${detailed ? 'كشف حساب تفصيلي' : 'كشف حساب'} — ${c.name}',
+        fileName: store.statementFileName(c, date: st.issueDate, detailed: detailed),
         message: ShareService.statementMessage(st, store.org),
-        build: () async => (await DocPdf.create(store.org)).statement(st),
+        build: () async => detailed
+            ? (await DocPdf.create(store.org)).statementDetailed(st, store.payments)
+            : (await DocPdf.create(store.org)).statement(st),
         kind: FileKind.statement,
         year: FileService.yearOf(st.issueDate),
       ),

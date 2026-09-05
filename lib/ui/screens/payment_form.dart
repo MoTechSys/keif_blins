@@ -180,7 +180,7 @@ class _PaymentFormState extends State<PaymentForm> {
             title: 'سند قبض ${p.receiptNumber}',
             fileName: store.receiptFileName(p),
             message: ShareService.receiptMessage(p, c, store.org),
-            build: () async => (await DocPdf.create(store.org)).receipt(p, c, inv),
+            build: () async => (await DocPdf.create(store.org)).receipt(p, c, inv, payments: store.payments),
             kind: FileKind.receipt,
             year: FileService.yearOf(p.date),
           ),

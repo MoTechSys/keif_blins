@@ -265,3 +265,116 @@ pw.Widget officialPageNum(PdfAssets a, pw.Context ctx, {String prefix = ''}) => 
         style: a.t(8.6, color: O.gold),
       ),
     );
+
+/* ---------- سند القبض (نصف صفحة A4 = A5 عرضي) ---------- */
+pw.PageTheme receiptPageTheme(PdfAssets a, Org org) => pw.PageTheme(
+      pageFormat: PdfPageFormat.a5.landscape,
+      theme: pw.ThemeData.withFont(base: a.regular, bold: a.bold).copyWith(
+        defaultTextStyle: pw.TextStyle(font: a.regular, fontSize: 10.2, color: O.ink, lineSpacing: 1.3),
+      ),
+      textDirection: pw.TextDirection.rtl,
+      margin: const pw.EdgeInsets.fromLTRB(18, 16, 18, 14),
+      buildBackground: (ctx) => pw.FullPage(
+        ignoreMargins: true,
+        child: pw.Stack(children: [
+          if (org.showWatermark)
+            pw.Positioned(
+              left: 0,
+              right: 0,
+              top: 110,
+              child: pw.Center(child: pw.Opacity(opacity: 0.07, child: pw.Image(a.logo, width: 200))),
+            ),
+        ]),
+      ),
+    );
+
+/// ترويسة مدمجة للسند: الشعار يمين، اسم المؤسسة بجواره، شارة مملوءة يسار.
+pw.Widget receiptHeader(PdfAssets a, Org org, {required String title, required String subtitle}) => pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.center,
+      children: [
+        pw.Image(a.logo, height: 58, fit: pw.BoxFit.contain),
+        pw.SizedBox(width: 10),
+        pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+          pw.Text(org.kingdom, style: a.t(9.4, color: O.ink)),
+          pw.Text(org.name, style: a.t(14.2, color: O.brown, black: true)),
+          if (org.showCr && org.cr.isNotEmpty)
+            pw.Row(children: [
+              pw.Text('س-ت ', style: a.t(9.2, color: O.gold, bold: true)),
+              pw.Text(org.cr, style: a.t(9.2, color: O.gold, bold: true), textDirection: pw.TextDirection.ltr),
+            ]),
+          if (org.showVatNumber && org.vat.isNotEmpty)
+            pw.Row(children: [
+              pw.Text('الرقم الضريبي ', style: a.t(8.6, color: O.gold, bold: true)),
+              pw.Text(org.vat, style: a.t(8.6, color: O.gold, bold: true), textDirection: pw.TextDirection.ltr),
+            ]),
+        ]),
+        pw.Spacer(),
+        pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 18, vertical: 7),
+          decoration: pw.BoxDecoration(
+            color: O.brown,
+            borderRadius: pw.BorderRadius.circular(4),
+            border: pw.Border.all(color: O.gold, width: 0.8),
+          ),
+          child: pw.Column(children: [
+            pw.Text(title, style: a.t(15, color: O.white, black: true)),
+            pw.SizedBox(height: 1),
+            pw.Text(subtitle, style: a.t(7.4, color: O.gold, bold: true), textDirection: pw.TextDirection.ltr),
+          ]),
+        ),
+      ],
+    );
+
+/// حقل بخط منقّط: التسمية بنية عريضة والقيمة بعدها.
+pw.Widget dottedField(PdfAssets a, String label, String value, {bool ltr = false, double size = 10.4, int flex = 1}) => pw.Expanded(
+      flex: flex,
+      child: pw.Container(
+        padding: const pw.EdgeInsets.only(bottom: 3),
+        decoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: O.gold, width: 0.7, style: pw.BorderStyle.dotted))),
+        child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.end, children: [
+          pw.Text('$label: ', style: a.t(size, color: O.brown, bold: true)),
+          pw.Expanded(
+            child: pw.Text(value.isEmpty ? '—' : value,
+                style: a.t(size, color: O.ink), textDirection: ltr ? pw.TextDirection.ltr : null, textAlign: ltr ? pw.TextAlign.right : null),
+          ),
+        ]),
+      ),
+    );
+
+/// مربع اختيار مع تسمية (مملوء عند التحديد)
+pw.Widget checkBox(PdfAssets a, String label, bool on, {double size = 9.6}) => pw.Row(mainAxisSize: pw.MainAxisSize.min, children: [
+      pw.Container(
+        width: 9,
+        height: 9,
+        decoration: pw.BoxDecoration(border: pw.Border.all(color: O.brown, width: 0.9), borderRadius: pw.BorderRadius.circular(1.5)),
+        child: on ? pw.Center(child: pw.Container(width: 5, height: 5, color: O.brown)) : null,
+      ),
+      pw.SizedBox(width: 4),
+      pw.Text(label, style: a.t(size, color: O.ink, bold: on)),
+    ]);
+
+/// صندوق بإطار (يُستخدم لرقم السند/التاريخ/المبلغ/طريقة الدفع)
+pw.Widget framedBox(pw.Widget child, {PdfColor? fill, double hPad = 10, double vPad = 6}) => pw.Container(
+      padding: pw.EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
+      decoration: pw.BoxDecoration(color: fill, border: pw.Border.all(color: O.line, width: 1.1), borderRadius: pw.BorderRadius.circular(3)),
+      child: child,
+    );
+
+/// شريط التذييل البني: البريد · الموقع · الجوال
+pw.Widget receiptFooterBand(PdfAssets a, Org org) {
+  final items = <String>[
+    if (org.email.isNotEmpty) org.email,
+    if (org.website.isNotEmpty) org.website,
+    if (org.phone.isNotEmpty) org.phone,
+  ];
+  return pw.Container(
+    padding: const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+    decoration: pw.BoxDecoration(color: O.brown, borderRadius: pw.BorderRadius.circular(3)),
+    child: pw.Row(
+      mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+      children: [
+        for (final s in items) pw.Text(s, style: a.t(9, color: O.white), textDirection: pw.TextDirection.ltr),
+      ],
+    ),
+  );
+}

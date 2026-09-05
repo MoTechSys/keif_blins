@@ -199,7 +199,8 @@ class Store extends ChangeNotifier {
   }
 
   /// كشف حساب - اسم العميل - التاريخ.pdf
-  String statementFileName(Client c, [String? date]) => 'كشف حساب - ${c.name.trim()} - ${date ?? todayISO()}.pdf';
+  String statementFileName(Client c, {String? date, bool detailed = false}) =>
+      '${detailed ? 'كشف حساب تفصيلي' : 'كشف حساب'} - ${c.name.trim()} - ${date ?? todayISO()}.pdf';
 
   /// إشعار تسليم - رقم الفاتورة - اسم العميل.pdf
   String deliveryFileName(Invoice d) => 'إشعار تسليم - ${d.number} - ${docClientName(d)}.pdf';

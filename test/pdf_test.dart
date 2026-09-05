@@ -85,13 +85,21 @@ void main() {
     expect(s2.opening, isNot(0), reason: 'حركات ما قبل يوليو تُرحَّل كرصيد سابق');
     expect(s2.closing, s2.opening + s2.billed - s2.paid);
     await save('statement_period.pdf', await pdf.statement(s2));
+
+    // الكشف التفصيلي: بنود كل فاتورة ودفعاتها + دفعات على الحساب
+    final det = await pdf.statementDetailed(s2, ps);
+    expect(det.length, greaterThan(20000));
+    await save('statement_detailed.pdf', det);
   });
 
   test('receipt PDF renders', () async {
     final pdf = await DocPdf.create(org);
-    final bytes = await pdf.receipt(pays.first, client, inv);
+    final bytes = await pdf.receipt(pays.first, client, inv, payments: pays);
     expect(bytes.length, greaterThan(10000));
     await save('receipt.pdf', bytes);
+    // سند على الحساب بلا فاتورة + بمرجع وملاحظات
+    final acc = Payment(id: 'p9', clientId: 'c1', invoiceId: '', amount: 350000, date: '2026-08-10', method: 'نقدًا', reference: 'CASH-01', notes: 'دفعة مقدمة لمناسبة سبتمبر', receiptNumber: 'REC-0009');
+    await save('receipt_account.pdf', await pdf.receipt(acc, client, null, payments: pays));
   });
 
   test('share messages', () {
