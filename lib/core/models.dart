@@ -220,7 +220,7 @@ class Invoice {
     this.attendees = '',
     List<LineItem>? items,
     this.discount = 0,
-    this.vatRateBp = 1500,
+    this.vatRateBp = 0, // بدون ضريبة افتراضيًا؛ النموذج يضبطها من إعدادات المؤسسة عند التفعيل
     this.deposit = 0,
     String? status,
     this.notes = '',
@@ -298,7 +298,7 @@ class Invoice {
         attendees: (m['attendees'] ?? '').toString(),
         items: ((m['items'] as List?) ?? []).map((e) => LineItem.fromMap(e as Map)).toList(),
         discount: (m['discount'] as num?)?.toInt() ?? 0,
-        vatRateBp: (m['vatRateBp'] as num?)?.toInt() ?? 1500,
+        vatRateBp: (m['vatRateBp'] as num?)?.toInt() ?? 0,
         deposit: (m['deposit'] as num?)?.toInt() ?? 0,
         status: (m['status'] ?? 'draft') as String,
         notes: (m['notes'] ?? '') as String,

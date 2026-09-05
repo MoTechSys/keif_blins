@@ -22,6 +22,7 @@ void main() {
     attendees: '120',
     deposit: 500000,
     discount: 50000,
+    vatRateBp: 1500, // اختبار مسار الضريبة صراحةً (الافتراضي الآن 0 = بدون ضريبة)
     items: [
       LineItem(desc: 'تجهيز قاعة ضيافة ملكية\nتنسيق طاولات وكراسي فاخرة\nإضاءة ديكورية وزهور طبيعية', unitPrice: 1500000, qty: 1, unitLabel: 'فترة'),
       LineItem(desc: 'بوفيه عشاء مفتوح\nأطباق رئيسية وحلويات ومشروبات', unitPrice: 25000, qty: 120, unitLabel: 'شخص', external: 80000),
@@ -61,7 +62,9 @@ void main() {
     final ps = <Payment>[];
     for (var i = 1; i <= 30; i++) {
       final d = '2026-${(i % 12 + 1).toString().padLeft(2, '0')}-${(i % 27 + 1).toString().padLeft(2, '0')}';
-      docs.add(Invoice(id: 'x$i', number: 'INV-${i.toString().padLeft(4, '0')}', clientId: 'c1', clientName: client.name, issueDate: d, status: 'sent', location: 'قاعة $i', items: [LineItem(desc: 'خدمة ضيافة $i', unitPrice: 100000 * i, qty: 1)]));
+      docs.add(Invoice(id: 'x$i', number: 'INV-${i.toString().padLeft(4, '0')}', clientId: 'c1', clientName: client.name, issueDate: d, status: 'sent', location: 'قاعة $i', items: [LineItem(desc: 'خدمة ضيافة $i', unitPrice: 100000 * i, qty: 1)],
+          // بعض الفواتير بضريبة/خصم للتحقق من ظهور أعمدة الشرح في الكشف
+          vatRateBp: i % 3 == 0 ? 1500 : 0, discount: i % 5 == 0 ? 10000 : 0));
       if (i.isEven) ps.add(Payment(id: 'p$i', clientId: 'c1', invoiceId: 'x$i', amount: 50000 * i, date: d, receiptNumber: 'REC-${i.toString().padLeft(4, '0')}'));
     }
     final s = buildStatement(client: client, invoices: docs, payments: ps, number: 'SOA-202608-001');

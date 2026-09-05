@@ -226,23 +226,30 @@ class DocPdf {
         : '${sameMonth ? '$periodTitle — ' : ''}من ${s.from.isEmpty ? 'البداية' : fmtDate(s.from)} حتى ${s.to.isEmpty ? fmtDate(s.issueDate) : fmtDate(s.to)}';
     final services = invs.fold<int>(0, (v, i) => v + i.totals.services);
     final external = invs.fold<int>(0, (v, i) => v + i.totals.external);
+    final discount = invs.fold<int>(0, (v, i) => v + i.totals.discount);
+    final vat = invs.fold<int>(0, (v, i) => v + i.totals.vat);
     final hasExt = external > 0;
+    // أعمدة الخصم والضريبة تظهر فقط إن وُجدت في أي فاتورة، حتى يكون الإجمالي مفسَّرًا دائمًا
+    final hasDisc = discount > 0;
+    final hasVat = vat > 0;
     final due = s.closing;
     final doc = _doc(label);
 
     String money(int h) => fmt(h, trimZeros: true);
 
+    // الأعمدة الاختيارية (مشتريات/خصم/ضريبة) تُضاف قبل عمود الإجمالي بالترتيب
+    final extraCols = (hasExt ? 1 : 0) + (hasDisc ? 1 : 0) + (hasVat ? 1 : 0);
     final widths = <int, pw.TableColumnWidth>{
       0: const pw.FixedColumnWidth(20), // م
       1: const pw.FixedColumnWidth(47), // رقم الفاتورة
       2: const pw.FixedColumnWidth(51), // تاريخ الإصدار
       3: const pw.FixedColumnWidth(53), // تاريخ الفعالية
-      4: const pw.FixedColumnWidth(57), // الموقع
+      4: pw.FixedColumnWidth(extraCols >= 2 ? 46 : 57), // الموقع
       5: const pw.FlexColumnWidth(), // البيان
       6: const pw.FixedColumnWidth(38), // الفترات
-      7: const pw.FixedColumnWidth(43), // السعر
-      if (hasExt) 8: const pw.FixedColumnWidth(52), // مشتريات خارجية
-      (hasExt ? 9 : 8): const pw.FixedColumnWidth(58), // الإجمالي
+      7: pw.FixedColumnWidth(extraCols >= 2 ? 40 : 43), // السعر
+      for (var k = 0; k < extraCols; k++) 8 + k: pw.FixedColumnWidth(hasExt && k == 0 ? 50 : 40),
+      8 + extraCols: pw.FixedColumnWidth(extraCols >= 2 ? 52 : 58), // الإجمالي
     };
     final rows = <pw.TableRow>[
       pw.TableRow(repeat: true, decoration: headDeco(), children: [
@@ -255,6 +262,8 @@ class DocPdf {
         oth(a, 'الفترات', size: 8.6),
         oth(a, 'السعر', size: 8.6),
         if (hasExt) oth(a, 'مشتريات\nخارجية', size: 8.6),
+        if (hasDisc) oth(a, 'الخصم', size: 8.6),
+        if (hasVat) oth(a, 'الضريبة', size: 8.6),
         oth(a, 'الإجمالي\n(ر.س)', size: 8.6),
       ]),
     ];
@@ -274,12 +283,14 @@ class DocPdf {
         otd(a, fmtQty(qty), size: 8.4, ltr: true, vPad: 7),
         otd(a, money(price), size: 8.4, ltr: true, vPad: 7),
         if (hasExt) otd(a, i.totals.external > 0 ? money(i.totals.external) : '—', size: 8.4, ltr: i.totals.external > 0, vPad: 7),
+        if (hasDisc) otd(a, i.totals.discount > 0 ? '- ${money(i.totals.discount)}' : '—', size: 8.4, ltr: i.totals.discount > 0, vPad: 7),
+        if (hasVat) otd(a, i.totals.vat > 0 ? money(i.totals.vat) : '—', size: 8.4, ltr: i.totals.vat > 0, vPad: 7),
         otd(a, money(i.totals.total), size: 8.4, ltr: true, bold: true, vPad: 7),
       ]));
     }
     if (invs.isEmpty) {
       rows.add(pw.TableRow(children: [
-        for (var k = 0; k < (hasExt ? 10 : 9); k++) k == 5 ? otd(a, 'لا توجد فواتير خلال الفترة', size: 8.6) : pw.SizedBox(),
+        for (var k = 0; k < 9 + extraCols; k++) k == 5 ? otd(a, 'لا توجد فواتير خلال الفترة', size: 8.6) : pw.SizedBox(),
       ]));
     }
 
@@ -317,6 +328,8 @@ class DocPdf {
             child: pw.Column(children: [
               _soaLine('إجمالي خدمات الضيافة', '${money(services)} ر.س'),
               if (hasExt) _soaLine('إجمالي المشتريات الخارجية', '${money(external)} ر.س'),
+              if (hasDisc) _soaLine('إجمالي الخصومات', '- ${money(discount)} ر.س'),
+              if (hasVat) _soaLine('إجمالي ضريبة القيمة المضافة', '${money(vat)} ر.س'),
               if (s.opening != 0) _soaLine('رصيد سابق قبل الفترة', '${money(s.opening)} ر.س'),
               if (s.paid > 0) _soaLine('المدفوع خلال الفترة', '${money(s.paid)} ر.س'),
             ]),
