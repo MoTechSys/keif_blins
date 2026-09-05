@@ -50,6 +50,8 @@ class Client {
   String address;
   String notes;
   int openingBalance; // هللة (رصيد افتتاحي مستحق)
+  /// تاريخ النقل إلى سلة المحذوفات (فارغ = نشط)
+  String deletedAt;
   String createdAt;
   String updatedAt;
 
@@ -64,6 +66,7 @@ class Client {
     this.address = '',
     this.notes = '',
     this.openingBalance = 0,
+    this.deletedAt = '',
     String? createdAt,
     String? updatedAt,
   })  : id = id ?? uid('c_'),
@@ -74,8 +77,10 @@ class Client {
         'id': id, 'name': name, 'contact': contact, 'phone': phone,
         'email': email, 'vatNumber': vatNumber, 'crNumber': crNumber,
         'address': address, 'notes': notes, 'openingBalance': openingBalance,
-        'createdAt': createdAt, 'updatedAt': updatedAt,
+        'deletedAt': deletedAt, 'createdAt': createdAt, 'updatedAt': updatedAt,
       };
+
+  bool get isDeleted => deletedAt.isNotEmpty;
 
   factory Client.fromMap(Map m) => Client(
         id: m['id'] as String?,
@@ -88,6 +93,7 @@ class Client {
         address: (m['address'] ?? '') as String,
         notes: (m['notes'] ?? '') as String,
         openingBalance: (m['openingBalance'] as num?)?.toInt() ?? 0,
+        deletedAt: (m['deletedAt'] ?? '') as String,
         createdAt: m['createdAt'] as String?,
         updatedAt: m['updatedAt'] as String?,
       );
@@ -193,6 +199,10 @@ class Invoice {
   String notes;
   String terms;
   String convertedTo; // رقم الفاتورة الناتجة عن عرض السعر
+  /// جوال العميل في "العرض السريع" (عرض سعر بلا عميل مسجّل: clientId فارغ)
+  String quickPhone;
+  /// تاريخ النقل إلى سلة المحذوفات (فارغ = نشط)
+  String deletedAt;
   String createdAt;
   String updatedAt;
 
@@ -216,6 +226,8 @@ class Invoice {
     this.notes = '',
     this.terms = '',
     this.convertedTo = '',
+    this.quickPhone = '',
+    this.deletedAt = '',
     String? createdAt,
     String? updatedAt,
   })  : id = id ?? uid('i_'),
@@ -227,6 +239,10 @@ class Invoice {
 
   bool get isQuote => kind == DocKind.quotation;
 
+  /// عرض سعر سريع: بلا عميل مسجّل (الاسم والجوال داخل العرض فقط)
+  bool get isQuick => clientId.isEmpty;
+  bool get isDeleted => deletedAt.isNotEmpty;
+
   Totals get totals {
     var services = 0, external = 0;
     for (final li in items) {
@@ -234,7 +250,9 @@ class Invoice {
       external += li.external;
     }
     final subtotal = services + external;
-    final afterDiscount = (subtotal - discount).clamp(0, 1 << 62);
+    // ملاحظة: لا نستخدم clamp(0, 1 << 62) لأن الإزاحة > 31 بت على الويب (dart2js) تعطي 0
+    // فيصبح الإجمالي 0.00 دائمًا. الخصم لا يتجاوز المجموع الفرعي أبدًا.
+    final afterDiscount = subtotal - discount < 0 ? 0 : subtotal - discount;
     final vat = vatRateBp > 0 ? roundHalfUp(afterDiscount * vatRateBp / 10000) : 0;
     return Totals(
       services: services,
@@ -262,6 +280,7 @@ class Invoice {
         'attendees': attendees, 'items': items.map((e) => e.toMap()).toList(),
         'discount': discount, 'vatRateBp': vatRateBp, 'deposit': deposit,
         'status': status, 'notes': notes, 'terms': terms, 'convertedTo': convertedTo,
+        'quickPhone': quickPhone, 'deletedAt': deletedAt,
         'createdAt': createdAt, 'updatedAt': updatedAt,
       };
 
@@ -285,6 +304,8 @@ class Invoice {
         notes: (m['notes'] ?? '') as String,
         terms: (m['terms'] ?? '') as String,
         convertedTo: (m['convertedTo'] ?? '') as String,
+        quickPhone: (m['quickPhone'] ?? '') as String,
+        deletedAt: (m['deletedAt'] ?? '') as String,
         createdAt: m['createdAt'] as String?,
         updatedAt: m['updatedAt'] as String?,
       );
@@ -307,6 +328,7 @@ class Payment {
   String reference;
   String notes;
   String receiptNumber;
+  String deletedAt;
   String createdAt;
 
   Payment({
@@ -319,6 +341,7 @@ class Payment {
     this.reference = '',
     this.notes = '',
     this.receiptNumber = '',
+    this.deletedAt = '',
     String? createdAt,
   })  : id = id ?? uid('p_'),
         date = date ?? todayISO(),
@@ -327,8 +350,10 @@ class Payment {
   Map<String, dynamic> toMap() => {
         'id': id, 'clientId': clientId, 'invoiceId': invoiceId, 'amount': amount,
         'date': date, 'method': method, 'reference': reference, 'notes': notes,
-        'receiptNumber': receiptNumber, 'createdAt': createdAt,
+        'receiptNumber': receiptNumber, 'deletedAt': deletedAt, 'createdAt': createdAt,
       };
+
+  bool get isDeleted => deletedAt.isNotEmpty;
 
   factory Payment.fromMap(Map m) => Payment(
         id: m['id'] as String?,
@@ -340,6 +365,7 @@ class Payment {
         reference: (m['reference'] ?? '') as String,
         notes: (m['notes'] ?? '') as String,
         receiptNumber: (m['receiptNumber'] ?? '') as String,
+        deletedAt: (m['deletedAt'] ?? '') as String,
         createdAt: m['createdAt'] as String?,
       );
 }
@@ -591,6 +617,24 @@ class Org {
   String invoiceTerms;
   String quoteTerms;
 
+  /* ---- الترقيم (ملاحظة 11ج) ----
+     'seq'      : تسلسلي  بادئة + رقم يبدأ من invStart  (INV-0001)
+     'datetime' : تلقائي من التاريخ والوقت             (INV-20260509-143522)  */
+  String numberingMode;
+  /// إدراج السنة في الرقم التسلسلي: INV-2026-0001
+  bool numberYear;
+
+  /* ---- عناصر المستندات (ملاحظة 11أ): لا يظهر إلا ما فُعِّل ---- */
+  bool showBank;        // بيانات البنك و IBAN في التذييل
+  bool showVatNumber;   // الرقم الضريبي في الترويسة
+  bool showCr;          // السجل التجاري في الترويسة
+  bool showTerms;       // صندوق الشروط
+  bool showSignatures;  // خانات التوقيع
+  bool showTafqit;      // المبلغ كتابةً
+  bool showAck;         // إقرار الاستلام في الفاتورة
+  bool showRemaining;   // سطر المدفوع/المتبقي في الفاتورة
+  bool showEventBlock;  // بطاقة تفاصيل المناسبة
+
   Org({
     this.name = 'مؤسسة كيف الضيافة',
     this.nameEn = 'KEIF ALDIAFA EST.',
@@ -617,6 +661,17 @@ class Org {
     this.quotePrefix = 'QT-',
     this.invoiceTerms = 'يُعتبر هذا المستند فاتورة رسمية صادرة من مؤسسة كيف الضيافة. تُسدَّد المبالغ المستحقة عبر التحويل البنكي على الحساب المذكور أدناه، مع ذكر رقم الفاتورة في وصف التحويل.',
     this.quoteTerms = 'هذا العرض ساري لمدة 15 يومًا من تاريخه. الأسعار شاملة الخدمة والتجهيز. يُعتمد العرض بتأكيد العميل ودفع العربون، وتُصدر الفاتورة النهائية بعد التنفيذ.',
+    this.numberingMode = 'seq',
+    this.numberYear = false,
+    this.showBank = true,
+    this.showVatNumber = false,
+    this.showCr = true,
+    this.showTerms = true,
+    this.showSignatures = true,
+    this.showTafqit = true,
+    this.showAck = false,
+    this.showRemaining = true,
+    this.showEventBlock = true,
   });
 
   Map<String, dynamic> toMap() => {
@@ -628,6 +683,10 @@ class Org {
         'invPrefix': invPrefix, 'invPad': invPad,
         'invStart': invStart, 'quotePrefix': quotePrefix, 'invoiceTerms': invoiceTerms,
         'quoteTerms': quoteTerms,
+        'numberingMode': numberingMode, 'numberYear': numberYear,
+        'showBank': showBank, 'showVatNumber': showVatNumber, 'showCr': showCr,
+        'showTerms': showTerms, 'showSignatures': showSignatures, 'showTafqit': showTafqit,
+        'showAck': showAck, 'showRemaining': showRemaining, 'showEventBlock': showEventBlock,
       };
 
   factory Org.fromMap(Map? m) {
@@ -660,6 +719,17 @@ class Org {
       quotePrefix: (m['quotePrefix'] ?? d.quotePrefix) as String,
       invoiceTerms: (m['invoiceTerms'] ?? d.invoiceTerms) as String,
       quoteTerms: (m['quoteTerms'] ?? d.quoteTerms) as String,
+      numberingMode: (m['numberingMode'] as String?) ?? 'seq',
+      numberYear: (m['numberYear'] as bool?) ?? false,
+      showBank: (m['showBank'] as bool?) ?? true,
+      showVatNumber: (m['showVatNumber'] as bool?) ?? ((m['vat'] as String?)?.isNotEmpty ?? false),
+      showCr: (m['showCr'] as bool?) ?? true,
+      showTerms: (m['showTerms'] as bool?) ?? true,
+      showSignatures: (m['showSignatures'] as bool?) ?? true,
+      showTafqit: (m['showTafqit'] as bool?) ?? true,
+      showAck: (m['showAck'] as bool?) ?? false,
+      showRemaining: (m['showRemaining'] as bool?) ?? true,
+      showEventBlock: (m['showEventBlock'] as bool?) ?? true,
     );
   }
 

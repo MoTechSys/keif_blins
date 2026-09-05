@@ -24,7 +24,7 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final store = context.watch<Store>();
     final k = store.kpis;
-    final recent = store.invoices.take(5).toList();
+    final recent = store.invoices.take(3).toList();
 
     // المستحقات حسب العميل (أكبر 4 أرصدة)
     final dues = <(Client, ClientSummary)>[];
@@ -34,51 +34,33 @@ class HomeScreen extends StatelessWidget {
     }
     dues.sort((a, b) => b.$2.outstanding.compareTo(a.$2.outstanding));
 
-    final isNew = store.clients.isEmpty || store.invoices.isEmpty;
-
     return ListView(
       padding: const EdgeInsets.fromLTRB(14, 6, 14, 28),
       children: [
         _TopBar(orgName: store.org.name, onMenu: onMenu),
         const SizedBox(height: 14),
 
-        if (isNew) ...[
-          _GettingStarted(
-            hasClient: store.clients.isNotEmpty,
-            hasInvoice: store.invoices.isNotEmpty,
-            onAddClient: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ClientForm())),
-            onAddInvoice: () => _newDoc(context, DocKind.invoice),
-            onSettings: onMenu,
-          ),
-          const SizedBox(height: 12),
-        ],
-
         // بطاقة الرصيد (hero)
         _HeroCard(k: k, clients: store.clients.length),
 
-        // إجراء سريع — 4 ألواح ملونة كما في التصميم الأصلي
-        const SectionTitle('إجراء سريع'),
+        // الأزرار الرئيسية — ترتيب دورة العمل: عميل → فاتورة → دفعة → كشف حساب
+        const SectionTitle('دورة العمل'),
         Row(children: [
-          Expanded(child: PlateAction(icon: Ic.invoice, label: 'فاتورة جديدة', color: PlateColor.gold, onTap: () => _newDoc(context, DocKind.invoice))),
-          const SizedBox(width: 8),
-          Expanded(child: PlateAction(icon: Ic.statement, label: 'كشف حساب', color: PlateColor.blue, onTap: () => onNavigate(3))),
-          const SizedBox(width: 8),
-          Expanded(child: PlateAction(icon: Ic.cash, label: 'تسجيل دفعة', color: PlateColor.green, onTap: () => _newPayment(context))),
-          const SizedBox(width: 8),
           Expanded(
             child: PlateAction(
               icon: Ic.clients,
-              label: 'عميل جديد',
+              label: 'إنشاء عميل',
+              hint: 'الخطوة 1',
               color: PlateColor.violet,
               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ClientForm())),
             ),
           ),
-        ]),
-        const SizedBox(height: 8),
-        Row(children: [
-          Expanded(child: _MiniAction(icon: Ic.edit, label: 'عرض سعر', onTap: () => _newDoc(context, DocKind.quotation))),
           const SizedBox(width: 8),
-          Expanded(child: _MiniAction(icon: Ic.chart, label: 'التقارير', onTap: onMenu)),
+          Expanded(child: PlateAction(icon: Ic.invoice, label: 'فاتورة جديدة', hint: 'الخطوة 2', color: PlateColor.gold, onTap: () => _newDoc(context, DocKind.invoice))),
+          const SizedBox(width: 8),
+          Expanded(child: PlateAction(icon: Ic.cash, label: 'تسجيل دفعة', hint: 'الخطوة 3', color: PlateColor.green, onTap: () => _newPayment(context))),
+          const SizedBox(width: 8),
+          Expanded(child: PlateAction(icon: Ic.statement, label: 'كشف حساب', hint: 'الخطوة 4', color: PlateColor.blue, onTap: () => onNavigate(3))),
         ]),
 
         // مستحقات قائمة
@@ -88,7 +70,7 @@ class HomeScreen extends StatelessWidget {
         ],
 
         // أحدث الفواتير
-        SectionTitle('أحدث الفواتير', action: TextButton(onPressed: () => onNavigate(2), child: const Text('الكل'))),
+        const SectionTitle('أحدث الفواتير'),
         if (recent.isEmpty)
           EmptyState(
             icon: Icons.receipt_long_outlined,
@@ -96,8 +78,15 @@ class HomeScreen extends StatelessWidget {
             hint: 'ابدأ بإضافة عميل ثم أنشئ أول فاتورة',
             action: FilledButton.icon(onPressed: () => _newDoc(context, DocKind.invoice), icon: const Icon(Icons.add), label: const Text('فاتورة جديدة')),
           )
-        else
+        else ...[
           for (final i in recent) InvoiceRow(i),
+          if (store.invoices.length > recent.length)
+            OutlinedButton.icon(
+              onPressed: () => onNavigate(2),
+              icon: const Icon(Icons.receipt_long_outlined, size: 18),
+              label: Text('عرض كل الفواتير (${store.invoices.length})'),
+            ),
+        ],
       ],
     );
   }
@@ -281,24 +270,6 @@ class _HeroCell extends StatelessWidget {
       );
 }
 
-/* ---------------- إجراء صغير ---------------- */
-class _MiniAction extends StatelessWidget {
-  final String icon, label;
-  final VoidCallback onTap;
-  const _MiniAction({required this.icon, required this.label, required this.onTap});
-  @override
-  Widget build(BuildContext context) => GoldCard(
-        onTap: onTap,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        child: Row(children: [
-          KIcon(icon, size: 26),
-          const SizedBox(width: 10),
-          Expanded(child: Text(label, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: C.text))),
-          Icon(Icons.chevron_left_rounded, color: C.text3, size: 20),
-        ]),
-      );
-}
-
 /* ---------------- صف مستحق ---------------- */
 class _DueRow extends StatelessWidget {
   final Client c;
@@ -363,76 +334,6 @@ class InvoiceRow extends StatelessWidget {
             const SizedBox(height: 4),
             if (st != null) StatusChip.invoice(st) else StatusChip.quote(inv.quoteStatus),
           ]),
-        ]),
-      ),
-    );
-  }
-}
-
-/* ---------------- بطاقة البداية (3 خطوات) ---------------- */
-class _GettingStarted extends StatelessWidget {
-  final bool hasClient, hasInvoice;
-  final VoidCallback onAddClient, onAddInvoice, onSettings;
-  const _GettingStarted({required this.hasClient, required this.hasInvoice, required this.onAddClient, required this.onAddInvoice, required this.onSettings});
-
-  @override
-  Widget build(BuildContext context) {
-    return GoldCard(
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const KIcon(Ic.dallah, size: 34),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('أهلًا بك في كيف الضيافة', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: C.text)),
-              Text('ابدأ في 3 خطوات — تختفي البطاقة بعد أول فاتورة', style: TextStyle(color: C.text3, fontSize: 11.5)),
-            ]),
-          ),
-        ]),
-        const SizedBox(height: 10),
-        _Step(1, 'راجع بيانات مؤسستك', 'الاسم والهاتف والحساب البنكي تظهر في كل مستند', done: false, onTap: onSettings, optional: true),
-        _Step(2, 'أضف أول عميل', 'يكفي الاسم فقط', done: hasClient, onTap: onAddClient),
-        _Step(3, 'أنشئ فاتورة وشاركها', 'اختر العميل، أضف البنود، ثم شاركها على واتساب', done: hasInvoice, onTap: hasClient ? onAddInvoice : null),
-      ]),
-    );
-  }
-}
-
-class _Step extends StatelessWidget {
-  final int n;
-  final String title, hint;
-  final bool done, optional;
-  final VoidCallback? onTap;
-  const _Step(this.n, this.title, this.hint, {required this.done, this.onTap, this.optional = false});
-  @override
-  Widget build(BuildContext context) {
-    final enabled = onTap != null;
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
-        child: Row(children: [
-          done
-              ? const KIcon(Ic.check, size: 28)
-              : Container(
-                  width: 28,
-                  height: 28,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(shape: BoxShape.circle, gradient: enabled ? C.goldGradient : null, color: enabled ? null : C.surface3),
-                  child: Text('$n', style: TextStyle(color: enabled ? C.onGold : C.text3, fontWeight: FontWeight.w900)),
-                ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Row(children: [
-                Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13.5, color: enabled || done ? C.text : C.text3, decoration: done ? TextDecoration.lineThrough : null)),
-                if (optional) ...[const SizedBox(width: 6), Text('(اختياري)', style: TextStyle(color: C.text3, fontSize: 11))],
-              ]),
-              Text(hint, style: TextStyle(color: C.text3, fontSize: 11.5)),
-            ]),
-          ),
-          if (enabled && !done) Icon(Icons.chevron_left_rounded, color: C.goldInk),
         ]),
       ),
     );

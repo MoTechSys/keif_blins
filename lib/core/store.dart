@@ -14,9 +14,17 @@ class Store extends ChangeNotifier {
   static const _boxName = 'keif_diafa';
   late Box _box;
 
+  /// القوائم النشطة (كل الشاشات تعتمد عليها)
   final List<Client> clients = [];
   final List<Invoice> docs = []; // فواتير + عروض أسعار
   final List<Payment> payments = [];
+
+  /// سلة المحذوفات (ملاحظة 8): تُحذف نهائيًا تلقائيًا بعد [trashDays] يومًا
+  static const trashDays = 30;
+  final List<Client> trashClients = [];
+  final List<Invoice> trashDocs = [];
+  final List<Payment> trashPayments = [];
+
   Org org = Org();
   bool ready = false;
 
@@ -37,6 +45,7 @@ class Store extends ChangeNotifier {
       _hiveInited = true;
       _box = await Hive.openBox(_boxName);
       _load();
+      await purgeExpiredTrash();
       ready = true;
     } catch (e, st) {
       debugPrint('Store.init failed: $e\n$st');
@@ -58,15 +67,22 @@ class Store extends ChangeNotifier {
       }
     }
 
-    clients
-      ..clear()
-      ..addAll(safe('clients', (m) => Client.fromMap(m)));
-    docs
-      ..clear()
-      ..addAll(safe('docs', (m) => Invoice.fromMap(m)));
-    payments
-      ..clear()
-      ..addAll(safe('payments', (m) => Payment.fromMap(m)));
+    // كل مفتاح يحمل النشط والمحذوف معًا؛ نفصلهما حسب deletedAt
+    clients.clear();
+    trashClients.clear();
+    for (final c in safe('clients', (m) => Client.fromMap(m))) {
+      (c.isDeleted ? trashClients : clients).add(c);
+    }
+    docs.clear();
+    trashDocs.clear();
+    for (final d in safe('docs', (m) => Invoice.fromMap(m))) {
+      (d.isDeleted ? trashDocs : docs).add(d);
+    }
+    payments.clear();
+    trashPayments.clear();
+    for (final p in safe('payments', (m) => Payment.fromMap(m))) {
+      (p.isDeleted ? trashPayments : payments).add(p);
+    }
     final o = _box.get('org');
     try {
       org = Org.fromMap(o is Map ? o : null);
@@ -84,11 +100,11 @@ class Store extends ChangeNotifier {
   Future<void> _save(String key) async {
     switch (key) {
       case 'clients':
-        await _box.put(key, clients.map((e) => e.toMap()).toList());
+        await _box.put(key, [...clients, ...trashClients].map((e) => e.toMap()).toList());
       case 'docs':
-        await _box.put(key, docs.map((e) => e.toMap()).toList());
+        await _box.put(key, [...docs, ...trashDocs].map((e) => e.toMap()).toList());
       case 'payments':
-        await _box.put(key, payments.map((e) => e.toMap()).toList());
+        await _box.put(key, [...payments, ...trashPayments].map((e) => e.toMap()).toList());
       case 'org':
         await _box.put(key, org.toMap());
     }
@@ -122,7 +138,9 @@ class Store extends ChangeNotifier {
     if (!FileService.supported) return null;
     // لا نكتب نسخة لقاعدة فارغة تلقائيًا (قد تكون بعد مسح مقصود)
     if (auto && clients.isEmpty && docs.isEmpty && payments.isEmpty) return null;
-    final name = auto ? 'auto-${todayISO()}.json' : 'keif-diafa-backup-${todayISO()}.json';
+    // ملاحظة 11ب: اسم النسخة اليدوية بالتاريخ والساعة والدقيقة  keif-backup-2026-05-09_14-35.json
+    // النسخة التلقائية: ملف واحد لليوم يُستبدل (auto-2026-05-09.json)
+    final name = auto ? 'auto-${todayISO()}.json' : 'keif-backup-${backupStamp()}.json';
     final p = await FileService.saveBackup(exportJson(), name);
     if (p != null) {
       lastAutoBackupPath = p;
@@ -131,6 +149,13 @@ class Store extends ChangeNotifier {
       notifyListeners();
     }
     return p;
+  }
+
+  /// 2026-05-09_14-35
+  static String backupStamp([DateTime? t]) {
+    final n = t ?? DateTime.now();
+    String two(int v) => v.toString().padLeft(2, '0');
+    return '${n.year}-${two(n.month)}-${two(n.day)}_${two(n.hour)}-${two(n.minute)}';
   }
 
   @override
@@ -157,6 +182,11 @@ class Store extends ChangeNotifier {
       invoices.where((i) => i.clientId == clientId).toList();
   List<Payment> clientPayments(String clientId) =>
       payments.where((p) => p.clientId == clientId).toList()..sort((a, b) => b.date.compareTo(a.date));
+  List<Invoice> clientQuotes(String clientId) =>
+      quotes.where((q) => q.clientId == clientId).toList();
+
+  /// اسم العميل الظاهر في المستند (عميل مسجّل أو عرض سريع)
+  String docClientName(Invoice d) => d.clientName.trim().isEmpty ? 'عميل' : d.clientName.trim();
 
   ClientSummary summary(Client c) => clientSummary(c, docs, payments);
 
@@ -188,21 +218,50 @@ class Store extends ChangeNotifier {
     );
   }
 
-  /* ---------- الترقيم ---------- */
+  /* ---------- الترقيم (ملاحظة 11ج) ---------- */
+  /// يشمل المحذوفات حتى لا يتكرر رقم مستند في السلة
+  Iterable<Invoice> get _allDocs => [...docs, ...trashDocs];
+
   String nextNumber(DocKind kind) {
     final prefix = kind == DocKind.invoice ? org.invPrefix : org.quotePrefix;
+    final now = DateTime.now();
+    String two(int v) => v.toString().padLeft(2, '0');
+    if (org.numberingMode == 'datetime') {
+      // INV-20260509-143522 — فريد بطبيعته؛ نضيف لاحقة إن تكرّر في نفس الثانية
+      final base = '$prefix${now.year}${two(now.month)}${two(now.day)}-${two(now.hour)}${two(now.minute)}${two(now.second)}';
+      var n = base;
+      var k = 1;
+      while (_allDocs.any((d) => d.number == n)) {
+        n = '$base-${k++}';
+      }
+      return n;
+    }
+    // تسلسلي: بادئة [+ سنة-] + رقم يبدأ من "يبدأ من"
+    final yearPart = org.numberYear ? '${now.year}-' : '';
     var max = org.invStart - 1;
-    for (final d in docs.where((d) => d.kind == kind)) {
+    for (final d in _allDocs.where((d) => d.kind == kind)) {
+      if (org.numberYear && !d.number.startsWith('$prefix$yearPart')) continue; // التسلسل يبدأ من جديد كل سنة
       final m = RegExp(r'(\d+)\s*$').firstMatch(d.number);
       final n = m == null ? null : int.tryParse(m[1]!);
       if (n != null && n > max) max = n;
     }
-    return '$prefix${(max + 1).toString().padLeft(org.invPad, '0')}';
+    return '$prefix$yearPart${(max + 1).toString().padLeft(org.invPad, '0')}';
+  }
+
+  /// مثال حي للرقم التالي (لشاشة الإعدادات)
+  String previewNumber(Org o, DocKind kind) {
+    final saved = org;
+    org = o;
+    try {
+      return nextNumber(kind);
+    } finally {
+      org = saved;
+    }
   }
 
   String nextReceiptNumber() {
     var max = 0;
-    for (final p in payments) {
+    for (final p in [...payments, ...trashPayments]) {
       final m = RegExp(r'REC-(\d+)').firstMatch(p.receiptNumber);
       final n = m == null ? null : int.tryParse(m[1]!);
       if (n != null && n > max) max = n;
@@ -238,10 +297,21 @@ class Store extends ChangeNotifier {
     await _save('clients');
   }
 
+  /// حذف عميل = نقله مع مستنداته ودفعاته إلى سلة المحذوفات (يمكن استرجاعه 30 يومًا)
   Future<void> deleteClient(String id) async {
-    clients.removeWhere((c) => c.id == id);
-    docs.removeWhere((d) => d.clientId == id);
-    payments.removeWhere((p) => p.clientId == id);
+    final stamp = DateTime.now().toIso8601String();
+    final c = clients.where((x) => x.id == id).firstOrNull;
+    if (c == null) return;
+    clients.remove(c);
+    trashClients.add(c..deletedAt = stamp);
+    for (final d in docs.where((d) => d.clientId == id).toList()) {
+      docs.remove(d);
+      trashDocs.add(d..deletedAt = stamp);
+    }
+    for (final p in payments.where((p) => p.clientId == id).toList()) {
+      payments.remove(p);
+      trashPayments.add(p..deletedAt = stamp);
+    }
     await _save('docs');
     await _save('payments');
     await _save('clients');
@@ -252,7 +322,7 @@ class Store extends ChangeNotifier {
     d.updatedAt = DateTime.now().toIso8601String();
     if (d.number.isEmpty) d.number = nextNumber(d.kind);
     final c = client(d.clientId);
-    if (c != null) d.clientName = c.name;
+    if (c != null) d.clientName = c.name; // العرض السريع يحتفظ باسمه المكتوب
     final i = docs.indexWhere((x) => x.id == d.id);
     if (i >= 0) {
       docs[i] = d;
@@ -262,15 +332,23 @@ class Store extends ChangeNotifier {
     await _save('docs');
   }
 
+  /// حذف مستند = نقله مع دفعاته المرتبطة إلى سلة المحذوفات
   Future<void> deleteDoc(String id) async {
-    docs.removeWhere((d) => d.id == id);
-    payments.removeWhere((p) => p.invoiceId == id);
+    final stamp = DateTime.now().toIso8601String();
+    final d = docs.where((x) => x.id == id).firstOrNull;
+    if (d == null) return;
+    docs.remove(d);
+    trashDocs.add(d..deletedAt = stamp);
+    for (final p in payments.where((p) => p.invoiceId == id).toList()) {
+      payments.remove(p);
+      trashPayments.add(p..deletedAt = stamp);
+    }
     await _save('payments');
     await _save('docs');
   }
 
-  /// تحويل عرض سعر إلى فاتورة
-  Future<Invoice> convertQuote(Invoice q) async {
+  /// تحويل عرض سعر إلى فاتورة. [clientId] يُمرَّر عند تحويل عرض سريع بعد إنشاء عميل له
+  Future<Invoice> convertQuote(Invoice q, {String? clientId}) async {
     final inv = q.copy()
       ..id = uid('i_')
       ..kind = DocKind.invoice
@@ -280,6 +358,10 @@ class Store extends ChangeNotifier {
       ..terms = org.invoiceTerms
       ..validUntil = ''
       ..convertedTo = '';
+    if (clientId != null && clientId.isNotEmpty) {
+      inv.clientId = clientId;
+      q.clientId = clientId; // يرتبط العرض بالعميل الجديد أيضًا
+    }
     inv.items = q.items.map((e) => e.copy()).toList();
     await saveDoc(inv);
     q.status = QuoteStatus.converted.name;
@@ -306,16 +388,132 @@ class Store extends ChangeNotifier {
     }
   }
 
+  /// حذف دفعة = نقلها إلى سلة المحذوفات وتحديث حالة الفاتورة
   Future<void> deletePayment(String id) async {
     final p = payments.where((x) => x.id == id).firstOrNull;
-    payments.removeWhere((x) => x.id == id);
+    if (p == null) return;
+    payments.remove(p);
+    trashPayments.add(p..deletedAt = DateTime.now().toIso8601String());
     await _save('payments');
-    if (p != null) {
-      final inv = doc(p.invoiceId);
-      if (inv != null && inv.countsInLedger) {
-        inv.status = computeStatus(inv, payments).name;
-        await _save('docs');
-      }
+    await _refreshInvoiceStatus(p.invoiceId);
+  }
+
+  Future<void> _refreshInvoiceStatus(String invoiceId) async {
+    final inv = doc(invoiceId);
+    if (inv != null && inv.countsInLedger) {
+      inv.status = computeStatus(inv, payments).name;
+      await _save('docs');
+    }
+  }
+
+  /* ---------- سلة المحذوفات (ملاحظة 8) ---------- */
+  int get trashCount => trashClients.length + trashDocs.length + trashPayments.length;
+
+  /// الأيام المتبقية قبل الحذف النهائي
+  static int daysLeft(String deletedAt) {
+    final t = DateTime.tryParse(deletedAt);
+    if (t == null) return 0;
+    final left = trashDays - DateTime.now().difference(t).inDays;
+    return left < 0 ? 0 : left;
+  }
+
+  Future<void> restoreClient(String id) async {
+    final c = trashClients.where((x) => x.id == id).firstOrNull;
+    if (c == null) return;
+    final stamp = c.deletedAt;
+    trashClients.remove(c);
+    clients.add(c..deletedAt = '');
+    // نسترجع ما حُذف معه في نفس العملية
+    for (final d in trashDocs.where((d) => d.clientId == id && d.deletedAt == stamp).toList()) {
+      trashDocs.remove(d);
+      docs.add(d..deletedAt = '');
+    }
+    for (final p in trashPayments.where((p) => p.clientId == id && p.deletedAt == stamp).toList()) {
+      trashPayments.remove(p);
+      payments.add(p..deletedAt = '');
+    }
+    await _save('clients');
+    await _save('docs');
+    await _save('payments');
+  }
+
+  Future<void> restoreDoc(String id) async {
+    final d = trashDocs.where((x) => x.id == id).firstOrNull;
+    if (d == null) return;
+    final stamp = d.deletedAt;
+    trashDocs.remove(d);
+    docs.add(d..deletedAt = '');
+    // إن كان عميله في السلة نسترجعه أيضًا حتى لا يبقى المستند بلا عميل
+    final tc = trashClients.where((c) => c.id == d.clientId).firstOrNull;
+    if (tc != null) {
+      trashClients.remove(tc);
+      clients.add(tc..deletedAt = '');
+    }
+    for (final p in trashPayments.where((p) => p.invoiceId == id && p.deletedAt == stamp).toList()) {
+      trashPayments.remove(p);
+      payments.add(p..deletedAt = '');
+    }
+    await _save('clients');
+    await _save('payments');
+    await _save('docs');
+    await _refreshInvoiceStatus(d.id);
+  }
+
+  Future<void> restorePayment(String id) async {
+    final p = trashPayments.where((x) => x.id == id).firstOrNull;
+    if (p == null) return;
+    trashPayments.remove(p);
+    payments.add(p..deletedAt = '');
+    await _save('payments');
+    await _refreshInvoiceStatus(p.invoiceId);
+  }
+
+  /// حذف نهائي لعنصر واحد
+  Future<void> purgeClient(String id) async {
+    trashClients.removeWhere((c) => c.id == id);
+    trashDocs.removeWhere((d) => d.clientId == id);
+    trashPayments.removeWhere((p) => p.clientId == id);
+    await _save('clients');
+    await _save('docs');
+    await _save('payments');
+  }
+
+  Future<void> purgeDoc(String id) async {
+    trashDocs.removeWhere((d) => d.id == id);
+    trashPayments.removeWhere((p) => p.invoiceId == id);
+    await _save('docs');
+    await _save('payments');
+  }
+
+  Future<void> purgePayment(String id) async {
+    trashPayments.removeWhere((p) => p.id == id);
+    await _save('payments');
+  }
+
+  /// إفراغ السلة كاملة
+  Future<void> emptyTrash() async {
+    trashClients.clear();
+    trashDocs.clear();
+    trashPayments.clear();
+    await _save('clients');
+    await _save('docs');
+    await _save('payments');
+  }
+
+  /// الحذف التلقائي لما تجاوز 30 يومًا (يُستدعى عند التشغيل)
+  Future<void> purgeExpiredTrash() async {
+    bool expired(String at) {
+      final t = DateTime.tryParse(at);
+      return t == null || DateTime.now().difference(t).inDays >= trashDays;
+    }
+    final before = trashCount;
+    trashClients.removeWhere((c) => expired(c.deletedAt));
+    trashDocs.removeWhere((d) => expired(d.deletedAt));
+    trashPayments.removeWhere((p) => expired(p.deletedAt));
+    if (trashCount != before) {
+      await _box.put('clients', [...clients, ...trashClients].map((e) => e.toMap()).toList());
+      await _box.put('docs', [...docs, ...trashDocs].map((e) => e.toMap()).toList());
+      await _box.put('payments', [...payments, ...trashPayments].map((e) => e.toMap()).toList());
     }
   }
 
@@ -355,12 +553,13 @@ class Store extends ChangeNotifier {
   /* ---------- النسخ الاحتياطي ---------- */
   String exportJson() => jsonEncode({
         'app': 'keif-diafa',
-        'schema': 2,
+        'schema': 3,
         'exportedAt': DateTime.now().toIso8601String(),
+        'counts': {'clients': clients.length, 'docs': docs.length, 'payments': payments.length},
         'data': {
-          'clients': clients.map((e) => e.toMap()).toList(),
-          'docs': docs.map((e) => e.toMap()).toList(),
-          'payments': payments.map((e) => e.toMap()).toList(),
+          'clients': [...clients, ...trashClients].map((e) => e.toMap()).toList(),
+          'docs': [...docs, ...trashDocs].map((e) => e.toMap()).toList(),
+          'payments': [...payments, ...trashPayments].map((e) => e.toMap()).toList(),
           'org': org.toMap(),
         },
       });
@@ -390,9 +589,22 @@ class Store extends ChangeNotifier {
       }
     }
 
+    // نعيد ما في السلة إلى القوائم العامة، ندمج، ثم نفصل المحذوف إلى السلة من جديد
+    clients.addAll(trashClients);
+    docs.addAll(trashDocs);
+    payments.addAll(trashPayments);
+    trashClients.clear();
+    trashDocs.clear();
+    trashPayments.clear();
     upsert<Client>(clients, maps(data['clients']), Client.fromMap, (c) => c.id);
     upsert<Invoice>(docs, [...maps(data['docs']), ...maps(data['invoices'])], Invoice.fromMap, (d) => d.id);
     upsert<Payment>(payments, maps(data['payments']), Payment.fromMap, (p) => p.id);
+    trashClients.addAll(clients.where((c) => c.isDeleted));
+    clients.removeWhere((c) => c.isDeleted);
+    trashDocs.addAll(docs.where((d) => d.isDeleted));
+    docs.removeWhere((d) => d.isDeleted);
+    trashPayments.addAll(payments.where((p) => p.isDeleted));
+    payments.removeWhere((p) => p.isDeleted);
     if (data['org'] is Map) {
       try {
         org = Org.fromMap({...org.toMap(), ...(data['org'] as Map)});
@@ -414,6 +626,9 @@ class Store extends ChangeNotifier {
     clients.clear();
     docs.clear();
     payments.clear();
+    trashClients.clear();
+    trashDocs.clear();
+    trashPayments.clear();
     org = Org();
     await _box.clear();
     notifyListeners();

@@ -55,7 +55,8 @@ class _SignInScreenState extends State<SignInScreen> {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(colors: [C.gold.withValues(alpha: 0.22), Colors.transparent]),
                 ),
-                child: const Image(image: AssetImage('assets/img/logo.png'), width: 150),
+                // الشعار بنص أبيض (كيف الضيافة / KEIF ALDIAFA) على الخلفية الداكنة؛ الأصلي على الفاتحة
+                child: Image(image: AssetImage(C.isDark ? 'assets/img/logo_light.png' : 'assets/img/logo.png'), width: 150),
               ),
               const SizedBox(height: 18),
               Text('مؤسسة كيف الضيافة', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: C.text)),

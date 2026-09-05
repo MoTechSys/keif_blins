@@ -29,10 +29,13 @@ class _DocFormState extends State<DocForm> {
   final _f = GlobalKey<FormState>();
   late Invoice d;
   late final TextEditingController location, attendees, discount, deposit, notes, terms;
+  // العرض السريع (ملاحظة 10): اسم وجوال داخل العرض فقط — لا يُسجَّل عميل
+  late final TextEditingController quickName, quickPhone;
   final List<_ItemCtl> items = [];
 
   bool _eventOpen = false;
   bool _notesOpen = false;
+  bool _quick = false;
 
   bool get isQ => d.isQuote;
 
@@ -44,7 +47,8 @@ class _DocFormState extends State<DocForm> {
     if (widget.doc != null) {
       d = widget.doc!.copy();
     } else {
-      d = Invoice(kind: widget.kind, clientId: widget.clientId ?? (store.clients.isNotEmpty ? store.clients.first.id : ''));
+      // لا نختار عميلًا تلقائيًا: المستخدم يحدده صراحة (أو يستعمل العرض السريع)
+      d = Invoice(kind: widget.kind, clientId: widget.clientId ?? '');
       d.status = isQ ? QuoteStatus.draft.name : InvoiceStatus.issued.name;
       d.terms = '';
       // الضريبة الافتراضية من الإعدادات — إن لم تكن مفعّلة فالفاتورة بلا ضريبة
@@ -61,6 +65,9 @@ class _DocFormState extends State<DocForm> {
     deposit = TextEditingController(text: d.deposit == 0 ? '' : fmt(d.deposit, trimZeros: true));
     notes = TextEditingController(text: d.notes);
     terms = TextEditingController(text: d.terms);
+    _quick = isQ && widget.doc != null && d.isQuick;
+    quickName = TextEditingController(text: _quick ? d.clientName : '');
+    quickPhone = TextEditingController(text: d.quickPhone);
     for (final li in d.items) {
       items.add(_ItemCtl(li));
     }
@@ -70,7 +77,7 @@ class _DocFormState extends State<DocForm> {
 
   @override
   void dispose() {
-    for (final t in [location, attendees, discount, deposit, notes, terms]) {
+    for (final t in [location, attendees, discount, deposit, notes, terms, quickName, quickPhone]) {
       t.dispose();
     }
     for (final it in items) {
@@ -104,7 +111,8 @@ class _DocFormState extends State<DocForm> {
         child: ListView(padding: const EdgeInsets.fromLTRB(16, 8, 16, 130), children: [
           // 1) العميل والتاريخ
           _StepTitle(1, 'العميل والتاريخ'),
-          _clientPicker(store),
+          if (isQ) _quickToggle(),
+          if (_quick) _quickFields() else _clientPicker(store),
           Row(children: [
             Expanded(child: _dateField(isQ ? 'تاريخ العرض' : 'تاريخ الفاتورة', d.issueDate, (v) => d.issueDate = v)),
             if (isQ) const SizedBox(width: 10),
@@ -187,7 +195,7 @@ class _DocFormState extends State<DocForm> {
                   Money(t.total, size: 22, color: C.goldInk),
                   if (d.deposit > 0) ...[
                     const SizedBox(width: 8),
-                    Padding(padding: const EdgeInsets.only(bottom: 3), child: Text('المتبقي ${fmt((t.total - d.deposit).clamp(0, 1 << 62), trimZeros: true)}', style: TextStyle(color: C.warn, fontSize: 11.5, fontWeight: FontWeight.w700))),
+                    Padding(padding: const EdgeInsets.only(bottom: 3), child: Text('المتبقي ${fmt(t.total - d.deposit < 0 ? 0 : t.total - d.deposit, trimZeros: true)}', style: TextStyle(color: C.warn, fontSize: 11.5, fontWeight: FontWeight.w700))),
                   ],
                 ]),
               ]),
@@ -198,6 +206,39 @@ class _DocFormState extends State<DocForm> {
       ),
     );
   }
+
+  /* ---------- العرض السريع (ملاحظة 10) ---------- */
+  Widget _quickToggle() => Padding(
+        padding: const EdgeInsets.only(bottom: 10),
+        child: SegmentedButton<bool>(
+          showSelectedIcon: false,
+          segments: const [
+            ButtonSegment(value: false, icon: Icon(Icons.person_outline_rounded, size: 18), label: Text('عميل مسجّل')),
+            ButtonSegment(value: true, icon: Icon(Icons.flash_on_rounded, size: 18), label: Text('عرض سريع')),
+          ],
+          selected: {_quick},
+          onSelectionChanged: (v) => setState(() {
+            _quick = v.first;
+            if (_quick) d.clientId = '';
+          }),
+        ),
+      );
+
+  Widget _quickFields() => Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+        decoration: BoxDecoration(color: C.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: C.line)),
+        child: Column(children: [
+          Row(children: [
+            Icon(Icons.info_outline_rounded, size: 16, color: C.text3),
+            const SizedBox(width: 6),
+            Expanded(child: Text('عرض سعر لغير عميل: الاسم والجوال يُحفظان داخل العرض فقط ولا يُضاف عميل ولا رصيد.', style: TextStyle(color: C.text3, fontSize: 11.5))),
+          ]),
+          const SizedBox(height: 8),
+          Field('اسم العميل', controller: quickName, icon: Icons.person_outline_rounded, validator: (v) => _quick && (v ?? '').trim().isEmpty ? 'مطلوب' : null),
+          Field('رقم الجوال (اختياري)', controller: quickPhone, icon: Icons.phone_outlined, type: TextInputType.phone),
+        ]),
+      );
 
   /* ---------- العميل ---------- */
   Widget _clientPicker(Store store) {
@@ -368,8 +409,8 @@ class _DocFormState extends State<DocForm> {
 
   Future<void> _save() async {
     final store = context.read<Store>();
-    if (!store.clients.any((c) => c.id == d.clientId)) {
-      toast(context, 'اختر العميل أولًا', error: true);
+    if (!_quick && !store.clients.any((c) => c.id == d.clientId)) {
+      toast(context, isQ ? 'اختر العميل أولًا — أو استخدم "عرض سريع"' : 'اختر العميل أولًا', error: true);
       return;
     }
     if (!_f.currentState!.validate()) {
@@ -377,6 +418,14 @@ class _DocFormState extends State<DocForm> {
       return;
     }
     _sync(store.org);
+    if (_quick) {
+      d
+        ..clientId = ''
+        ..clientName = quickName.text.trim()
+        ..quickPhone = quickPhone.text.trim();
+    } else {
+      d.quickPhone = '';
+    }
     d
       ..location = location.text.trim()
       ..attendees = attendees.text.trim()
