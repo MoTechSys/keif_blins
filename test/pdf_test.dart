@@ -62,7 +62,23 @@ void main() {
     final ps = <Payment>[];
     for (var i = 1; i <= 30; i++) {
       final d = '2026-${(i % 12 + 1).toString().padLeft(2, '0')}-${(i % 27 + 1).toString().padLeft(2, '0')}';
-      docs.add(Invoice(id: 'x$i', number: 'INV-${i.toString().padLeft(4, '0')}', clientId: 'c1', clientName: client.name, issueDate: d, status: 'sent', location: 'قاعة $i', items: [LineItem(desc: 'خدمة ضيافة $i', unitPrice: 100000 * i, qty: 1)],
+      // تنويع البنود ليُثبت الكشف التفصيلي اكتماله: مشتريات خارجية، وصف متعدد الأسطر، وحدات مختلطة، عربون، ملاحظات، وفاتورة طويلة (>6 بنود) لوضع الانقسام
+      final items = <LineItem>[LineItem(desc: 'خدمة ضيافة $i', unitPrice: 100000 * i, qty: 1)];
+      if (i % 4 == 0) {
+        items
+          ..add(LineItem(desc: 'ضيافة كاملة لفعالية\n- قهوة عربية وتمور فاخرة\n- عصائر طبيعية ومياه\n- طاقم خدمة 4 أفراد', unitPrice: 250000, qty: 2, unitLabel: 'يوم', external: 80000))
+          ..add(LineItem(desc: 'استئجار أدوات تقديم', unitPrice: 15000, qty: 12, unitLabel: 'قطعة', external: 30000));
+      }
+      if (i == 19) {
+        for (var k = 1; k <= 8; k++) {
+          items.add(LineItem(desc: 'بند إضافي رقم $k للفعالية الممتدة', unitPrice: 12500 * k, qty: k.toDouble(), unitLabel: 'شخص'));
+        }
+      }
+      docs.add(Invoice(id: 'x$i', number: 'INV-${i.toString().padLeft(4, '0')}', clientId: 'c1', clientName: client.name, issueDate: d, status: 'sent', location: 'قاعة $i',
+          eventDate: i % 4 == 0 ? d : '', eventDateTo: i % 8 == 0 ? '2026-${(i % 12 + 1).toString().padLeft(2, '0')}-${(i % 27 + 3).toString().padLeft(2, '0')}' : '',
+          attendees: i % 4 == 0 ? '${40 + i}' : '', items: items,
+          deposit: i % 4 == 0 ? 150000 : 0,
+          notes: i % 6 == 0 ? 'تم التنسيق مع مسؤول الفعالية؛ التوريد قبل الموعد بساعتين.' : '',
           // بعض الفواتير بضريبة/خصم للتحقق من ظهور أعمدة الشرح في الكشف
           vatRateBp: i % 3 == 0 ? 1500 : 0, discount: i % 5 == 0 ? 10000 : 0));
       if (i.isEven) ps.add(Payment(id: 'p$i', clientId: 'c1', invoiceId: 'x$i', amount: 50000 * i, date: d, receiptNumber: 'REC-${i.toString().padLeft(4, '0')}'));

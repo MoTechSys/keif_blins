@@ -386,7 +386,7 @@ class DocPdf {
       );
 
   /* ==========================================================
-     كشف حساب تفصيلي — كل فاتورة ببنودها ودفعاتها وحالتها
+     كشف حساب تفصيلي — بطاقة لكل فاتورة: بنودها كاملة، دفعاتها، إجمالياتها وحالتها
      ========================================================== */
   Future<Uint8List> statementDetailed(Statement s, List<Payment> allPayments) async {
     final label = 'كشف حساب تفصيلي ${s.number}';
@@ -397,11 +397,18 @@ class DocPdf {
     String money(int h) => fmt(h, trimZeros: true);
     bool inRange(String d) => (s.from.isEmpty || d.compareTo(s.from) >= 0) && (s.to.isEmpty || d.compareTo(s.to) <= 0);
 
-    final pays = allPayments.where((p) => p.clientId == s.client.id && !p.isDeleted).toList()..sort((x, y) => x.date.compareTo(y.date));
+    final pays = allPayments.where((p) => p.clientId == s.client.id && !p.isDeleted).toList()
+      ..sort((x, y) {
+        final c = x.date.compareTo(y.date);
+        return c != 0 ? c : x.createdAt.compareTo(y.createdAt);
+      });
     final onAccount = pays.where((p) => p.invoiceId.isEmpty && inRange(p.date)).toList();
 
     final due = s.closing;
     final badgeStatus = due > 0 ? 'مستحق: ${money(due)} ر.س' : (due < 0 ? 'دائن: ${money(-due)} ر.س' : 'لا مستحقات');
+
+    // إجماليات حالة الفواتير للملخص
+    var cntPaid = 0, cntPartial = 0, cntUnpaid = 0, sumDeposits = 0, sumPays = 0;
 
     final body = <pw.Widget>[
       metaBlock(
@@ -420,13 +427,13 @@ class DocPdf {
           ('عدد الفواتير', '${s.count}', true),
         ],
       ),
-      pw.SizedBox(height: 6),
+      pw.SizedBox(height: 4),
     ];
 
     if (s.invoices.isEmpty) {
       body.add(pw.Container(
         padding: const pw.EdgeInsets.all(14),
-        decoration: pw.BoxDecoration(border: pw.Border.all(color: O.line, width: 1.1)),
+        decoration: cardDeco(),
         child: pw.Center(child: pw.Text('لا توجد فواتير خلال الفترة', style: a.t(10.8, color: O.ink))),
       ));
     }
@@ -436,61 +443,78 @@ class DocPdf {
       n++;
       final invPays = pays.where((p) => p.invoiceId == inv.id).toList();
       final t = inv.totals;
-      final paid = invoicePaid(inv, invPays);
+      final extraPaid = invPays.fold<int>(0, (x, p) => x + p.amount);
+      final paid = inv.deposit + extraPaid;
       final remaining = t.total - paid;
       final st = computeStatus(inv, invPays);
       final stLabel = statusLabel[st] ?? '';
       final stColor = st == InvoiceStatus.paid ? O.green : (st == InvoiceStatus.partial ? O.gold : O.red);
+      if (st == InvoiceStatus.paid) {
+        cntPaid++;
+      } else if (st == InvoiceStatus.partial) {
+        cntPartial++;
+      } else {
+        cntUnpaid++;
+      }
+      sumDeposits += inv.deposit;
+      sumPays += extraPaid;
+
+      final hasExt = inv.items.any((i) => i.external > 0);
+      final hasDiscount = t.discount > 0;
       final hasVat = t.vatRateBp > 0 && t.vat > 0;
       final vatPct = t.vatRateBp % 100 == 0 ? '${t.vatRateBp ~/ 100}' : (t.vatRateBp / 100).toStringAsFixed(1);
-      final extras = <String>[
-        if (inv.eventDate.isNotEmpty) 'الفعالية: ${_eventRange(inv)}',
-        if (inv.location.isNotEmpty) 'الموقع: ${inv.location}',
-        if (inv.attendees.isNotEmpty) 'الحضور: ${inv.attendees}',
+      final qtyHead = _qtyHeader(inv);
+      final mixedUnits = qtyHead == 'الكمية';
+      final meta = <(String, String, bool)>[
+        if (inv.eventDate.isNotEmpty) ('تاريخ الفعالية', _eventRange(inv), true),
+        if (inv.location.isNotEmpty) ('الموقع', inv.location, false),
+        if (inv.attendees.isNotEmpty) ('عدد الحضور', inv.attendees, true),
       ];
 
-      // شريط عنوان الفاتورة
-      final head = <pw.Widget>[];
-      head.add(pw.SizedBox(height: 10));
-      head.add(pw.Container(
-        padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: pw.BoxDecoration(color: O.headFill, border: pw.Border.all(color: O.line, width: 1.1)),
-        child: pw.Row(children: [
-          pw.Text('$n. فاتورة ', style: a.t(11.4, color: O.brown, black: true)),
-          pw.Text(inv.number, style: a.t(11.4, color: O.brown, black: true), textDirection: pw.TextDirection.ltr),
-          pw.Text('  —  بتاريخ ', style: a.t(10.4, color: O.ink)),
-          pw.Text(fmtDate(inv.issueDate), style: a.t(10.4, color: O.ink, bold: true), textDirection: pw.TextDirection.ltr),
-          pw.Spacer(),
-          pw.Container(
-            padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: pw.BoxDecoration(border: pw.Border.all(color: stColor, width: 1), borderRadius: pw.BorderRadius.circular(3)),
-            child: pw.Text(stLabel, style: a.t(9.6, color: stColor, bold: true)),
-          ),
-        ]),
-      ));
-      if (extras.isNotEmpty) {
-        head.add(pw.Padding(
-          padding: const pw.EdgeInsets.fromLTRB(4, 4, 4, 0),
-          child: pw.Text(extras.join('   •   '), style: a.t(9.8, color: O.ink)),
-        ));
-      }
-      head.add(pw.SizedBox(height: 5));
+      // ---- 1) شريط عنوان البطاقة
+      final header = cardHeader([
+        pw.Text('$n', style: a.t(11, color: O.brown, black: true)),
+        pw.Text('.  فاتورة رقم ', style: a.t(11, color: O.brown, black: true)),
+        pw.Text(inv.number, style: a.t(11, color: O.brown, black: true), textDirection: pw.TextDirection.ltr),
+        pw.SizedBox(width: 14),
+        pw.Text('التاريخ: ', style: a.t(10, color: O.brown, bold: true)),
+        pw.Text(fmtDate(inv.issueDate), style: a.t(10, color: O.ink), textDirection: pw.TextDirection.ltr),
+        pw.Spacer(),
+        pw.Container(
+          padding: const pw.EdgeInsets.symmetric(horizontal: 9, vertical: 2.5),
+          decoration: pw.BoxDecoration(color: O.white, border: pw.Border.all(color: stColor, width: 1), borderRadius: pw.BorderRadius.circular(3)),
+          child: pw.Text(stLabel, style: a.t(9.6, color: stColor, bold: true)),
+        ),
+      ]);
 
-      // بنود الفاتورة
-      final hasExt = inv.items.any((i) => i.external > 0);
+      // ---- 2) بيانات الفعالية (إن وُجدت)
+      final metaLine = meta.isEmpty
+          ? null
+          : pw.Padding(
+              padding: const pw.EdgeInsets.fromLTRB(8, 6, 8, 2),
+              child: pw.Wrap(spacing: 18, runSpacing: 2, children: [
+                for (final e in meta)
+                  pw.Row(mainAxisSize: pw.MainAxisSize.min, children: [
+                    pw.Text('${e.$1}: ', style: a.t(9.8, color: O.brown, bold: true)),
+                    pw.Text(e.$2, style: a.t(9.8, color: O.ink), textDirection: e.$3 ? pw.TextDirection.ltr : null),
+                  ]),
+              ]),
+            );
+
+      // ---- 3) جدول البنود (نفس أعمدة الفاتورة ووصفها الكامل)
       final iw = <int, pw.TableColumnWidth>{
-        0: const pw.FixedColumnWidth(26),
+        0: const pw.FixedColumnWidth(24),
         1: const pw.FlexColumnWidth(),
-        2: const pw.FixedColumnWidth(64),
-        3: const pw.FixedColumnWidth(78),
-        if (hasExt) 4: const pw.FixedColumnWidth(78),
-        (hasExt ? 5 : 4): const pw.FixedColumnWidth(84),
+        2: const pw.FixedColumnWidth(66),
+        3: const pw.FixedColumnWidth(76),
+        if (hasExt) 4: const pw.FixedColumnWidth(72),
+        (hasExt ? 5 : 4): const pw.FixedColumnWidth(80),
       };
       final irows = <pw.TableRow>[
         pw.TableRow(repeat: true, decoration: headDeco(), children: [
           oth(a, 'م', size: 9.8),
           oth(a, 'الوصف', size: 9.8),
-          oth(a, 'الكمية', size: 9.8),
+          oth(a, qtyHead, size: 9.8),
           oth(a, 'السعر', size: 9.8),
           if (hasExt) oth(a, 'مشتريات خارجية', size: 9.8),
           oth(a, 'الإجمالي', size: 9.8),
@@ -500,9 +524,9 @@ class DocPdf {
       for (final li in inv.items) {
         k++;
         irows.add(pw.TableRow(decoration: k.isEven ? const pw.BoxDecoration(color: O.zebra) : null, children: [
-          otd(a, '$k', size: 9.6, vPad: 6),
-          otd(a, li.desc.split('\n').first.trim(), align: pw.Alignment.centerRight, size: 9.8, vPad: 6),
-          otd(a, '${fmtQty(li.qty)} ${li.unitLabel}', size: 9.6, vPad: 6),
+          otd(a, '$k', size: 9.6, ltr: true, vPad: 6),
+          _descCellSized(li.desc, 9.9, 9.4),
+          otd(a, '${fmtQty(li.qty)}${mixedUnits ? ' ${li.unitLabel}' : ''}', size: 9.6, ltr: !mixedUnits, vPad: 6),
           otd(a, money(li.unitPrice), size: 9.6, ltr: true, vPad: 6),
           if (hasExt) otd(a, li.external > 0 ? money(li.external) : '—', size: 9.6, ltr: true, vPad: 6),
           otd(a, money(li.total), size: 9.6, ltr: true, bold: true, vPad: 6),
@@ -518,11 +542,9 @@ class DocPdf {
           pw.SizedBox(),
         ]));
       }
-      final itemsTable = officialTable(columnWidths: iw, children: irows);
-      // كتلة الفاتورة: العنوان + البنود + الدفعات + الإجماليات
-      final block = <pw.Widget>[...head, itemsTable, pw.SizedBox(height: 6)];
+      final itemsTable = officialTable(columnWidths: iw, children: irows, border: innerBorder(top: 1.1, bottom: 1.1));
 
-      // الدفعات على الفاتورة (يمين) + الإجماليات (يسار)
+      // ---- 4) الدفعات (يمين) + الإجماليات (يسار)
       final prow = <pw.TableRow>[
         pw.TableRow(decoration: headDeco(), children: [
           oth(a, 'التاريخ', size: 9.4),
@@ -532,155 +554,251 @@ class DocPdf {
         ]),
         if (inv.deposit > 0)
           pw.TableRow(children: [
-            otd(a, fmtDate(inv.issueDate), size: 9.4, ltr: true, vPad: 5),
-            otd(a, '—', size: 9.4, vPad: 5),
-            otd(a, 'عربون', size: 9.4, vPad: 5),
-            otd(a, money(inv.deposit), size: 9.4, ltr: true, color: O.green, bold: true, vPad: 5),
+            otd(a, fmtDate(inv.issueDate), size: 9.4, ltr: true, vPad: 4.5),
+            otd(a, '—', size: 9.4, vPad: 4.5),
+            otd(a, 'عربون', size: 9.4, vPad: 4.5),
+            otd(a, money(inv.deposit), size: 9.4, ltr: true, color: O.green, bold: true, vPad: 4.5),
           ]),
         for (final p in invPays)
           pw.TableRow(children: [
-            otd(a, fmtDate(p.date), size: 9.4, ltr: true, vPad: 5),
-            otd(a, p.receiptNumber.isNotEmpty ? p.receiptNumber : p.reference, size: 9.2, ltr: true, vPad: 5),
-            otd(a, p.method, size: 9.4, vPad: 5),
-            otd(a, money(p.amount), size: 9.4, ltr: true, color: O.green, bold: true, vPad: 5),
+            otd(a, fmtDate(p.date), size: 9.4, ltr: true, vPad: 4.5),
+            otd(a, p.receiptNumber.isNotEmpty ? p.receiptNumber : (p.reference.isNotEmpty ? p.reference : '—'), size: 9.2, ltr: true, vPad: 4.5),
+            otd(a, p.method, size: 9.4, vPad: 4.5),
+            otd(a, money(p.amount), size: 9.4, ltr: true, color: O.green, bold: true, vPad: 4.5),
+          ]),
+        if (paid > 0)
+          pw.TableRow(decoration: const pw.BoxDecoration(color: O.zebra), children: [
+            // عمود التاريخ ضيق (58pt) فيُكتفى بـ«الإجمالي» كي لا ينكسر العنوان على سطرين
+            otd(a, 'الإجمالي', align: pw.Alignment.centerRight, size: 9.4, bold: true, vPad: 4.5),
+            pw.SizedBox(),
+            pw.SizedBox(),
+            otd(a, money(paid), size: 9.4, ltr: true, color: O.green, bold: true, vPad: 4.5),
           ]),
       ];
-      final noPays = inv.deposit == 0 && invPays.isEmpty;
-      block.add(pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-        pw.Expanded(
-          child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
-            pw.Text('الدفعات المستلمة على الفاتورة', style: a.t(9.8, color: O.brown, bold: true)),
-            pw.SizedBox(height: 3),
-            if (noPays)
+      final noPays = paid == 0;
+      final remLabel = remaining > 0 ? 'المتبقي' : (remaining < 0 ? 'مدفوع بالزيادة' : 'المتبقي');
+      final remColor = remaining > 0 ? O.red : O.green;
+      final bottom = pw.Padding(
+        padding: const pw.EdgeInsets.fromLTRB(8, 7, 8, 8),
+        child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+          // الدفعات — يمين
+          pw.Expanded(
+            child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              pw.Text('الدفعات المستلمة على الفاتورة', style: a.t(9.8, color: O.brown, bold: true)),
+              pw.SizedBox(height: 4),
+              if (noPays)
+                pw.Container(
+                  width: double.infinity,
+                  padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+                  decoration: pw.BoxDecoration(border: pw.Border.all(color: O.line, width: 0.85), color: O.zebra),
+                  child: pw.Text('لم تُستلم أي دفعة على هذه الفاتورة حتى تاريخ الكشف', style: a.t(9.4, color: O.red)),
+                )
+              else
+                officialTable(columnWidths: {
+                  0: const pw.FixedColumnWidth(58),
+                  1: const pw.FixedColumnWidth(68),
+                  2: const pw.FlexColumnWidth(),
+                  3: const pw.FixedColumnWidth(72),
+                }, children: prow),
+            ]),
+          ),
+          pw.SizedBox(width: 16),
+          // الإجماليات — يسار (نفس بنية الفاتورة)
+          pw.SizedBox(
+            width: 226,
+            child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+              pw.Text('إجماليات الفاتورة', style: a.t(9.8, color: O.brown, bold: true)),
+              pw.SizedBox(height: 4),
               pw.Container(
-                padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 7),
-                decoration: pw.BoxDecoration(border: pw.Border.all(color: O.line, width: 1.1)),
-                child: pw.Text('لا توجد دفعات مستلمة على هذه الفاتورة حتى تاريخ الكشف', style: a.t(9.4, color: O.red)),
-              )
-            else
-              officialTable(columnWidths: {
-                0: const pw.FixedColumnWidth(60),
-                1: const pw.FixedColumnWidth(70),
-                2: const pw.FlexColumnWidth(),
-                3: const pw.FixedColumnWidth(76),
-              }, children: prow),
-          ]),
-        ),
-        pw.SizedBox(width: 14),
-        pw.SizedBox(
-          width: 220,
-          child: pw.Column(children: [
-            if (hasExt) _dLine('خدمات الضيافة', money(t.services)),
-            if (hasExt) _dLine('مشتريات خارجية', money(t.external)),
-            if (t.discount > 0 || hasVat) _dLine('المجموع', money(t.subtotal)),
-            if (t.discount > 0) _dLine('الخصم', '- ${money(t.discount)}'),
-            if (hasVat) _dLine('ضريبة القيمة المضافة ($vatPct%)', money(t.vat)),
-            _dLine('إجمالي الفاتورة', money(t.total), bold: true, top: true),
-            _dLine('المدفوع', money(paid), color: O.green, bold: true),
-            _dLine(remaining > 0 ? 'المتبقي' : (remaining < 0 ? 'مدفوع بالزيادة' : 'المتبقي'), money(remaining.abs()), color: remaining > 0 ? O.red : O.brown, bold: true),
-          ]),
-        ),
-      ]));
-      if (inv.notes.trim().isNotEmpty) {
-        block.add(pw.Padding(
-          padding: const pw.EdgeInsets.only(top: 4),
-          child: pw.Text('ملاحظات الفاتورة: ${inv.notes.trim()}', style: a.t(9.4, color: O.ink)),
+                padding: const pw.EdgeInsets.fromLTRB(8, 4, 8, 4),
+                decoration: pw.BoxDecoration(border: pw.Border.all(color: O.line, width: 0.85)),
+                child: pw.Column(children: [
+                  if (hasExt) _dLine('خدمات الضيافة', money(t.services)),
+                  if (hasExt) _dLine('مشتريات خارجية', money(t.external)),
+                  if (hasDiscount || hasVat) _dLine('المجموع', money(t.subtotal)),
+                  if (hasDiscount) _dLine('الخصم', '- ${money(t.discount)}'),
+                  if (hasVat) _dLine('ضريبة القيمة المضافة ($vatPct%)', money(t.vat)),
+                  _dLine('إجمالي الفاتورة', money(t.total), bold: true, top: hasExt || hasDiscount || hasVat),
+                  if (inv.deposit > 0) _dLine('العربون', money(inv.deposit), color: O.green),
+                  if (extraPaid > 0) _dLine('الدفعات', money(extraPaid), color: O.green),
+                  _dLine(remLabel, money(remaining.abs()), color: remColor, bold: true, top: true),
+                ]),
+              ),
+            ]),
+          ),
+        ]),
+      );
+
+      // ---- 5) ملاحظات الفاتورة
+      final notes = inv.notes.trim().isEmpty
+          ? null
+          : pw.Container(
+              padding: const pw.EdgeInsets.fromLTRB(8, 5, 8, 6),
+              decoration: const pw.BoxDecoration(border: pw.Border(top: pw.BorderSide(color: O.line, width: 0.85))),
+              child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                pw.Text('ملاحظات: ', style: a.t(9.4, color: O.brown, bold: true)),
+                pw.Expanded(child: pw.Text(inv.notes.trim(), style: a.t(9.4, color: O.ink))),
+              ]),
+            );
+
+      // ---- تجميع البطاقة: القصيرة كتلة واحدة لا تنقسم؛ الطويلة تُقسَّم مع تكرار رأس الجدول
+      final short = inv.items.length + invPays.length <= 6;
+      body.add(pw.SizedBox(height: 10));
+      if (short) {
+        body.add(pw.Inseparable(
+          child: pw.Container(
+            decoration: cardDeco(),
+            child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+              header,
+              if (metaLine != null) metaLine,
+              pw.SizedBox(height: metaLine != null ? 5 : 7),
+              pw.Padding(padding: const pw.EdgeInsets.symmetric(horizontal: 8), child: itemsTable),
+              bottom,
+              if (notes != null) notes,
+            ]),
+          ),
+        ));
+      } else {
+        // بطاقة مفتوحة من الأسفل (يُغلقها الذيل) كي ينقسم الجدول بين الصفحات
+        body.add(pw.Inseparable(
+          child: pw.Container(
+            decoration: const pw.BoxDecoration(border: pw.Border(top: pw.BorderSide(color: O.line, width: 1.1), left: pw.BorderSide(color: O.line, width: 1.1), right: pw.BorderSide(color: O.line, width: 1.1))),
+            child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+              header,
+              if (metaLine != null) metaLine,
+              pw.SizedBox(height: metaLine != null ? 5 : 7),
+            ]),
+          ),
+        ));
+        body.add(pw.Container(
+          decoration: const pw.BoxDecoration(border: pw.Border(left: pw.BorderSide(color: O.line, width: 1.1), right: pw.BorderSide(color: O.line, width: 1.1))),
+          padding: const pw.EdgeInsets.symmetric(horizontal: 8),
+          child: itemsTable,
+        ));
+        body.add(pw.Inseparable(
+          child: pw.Container(
+            decoration: const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(color: O.line, width: 1.1), left: pw.BorderSide(color: O.line, width: 1.1), right: pw.BorderSide(color: O.line, width: 1.1))),
+            child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [bottom, if (notes != null) notes]),
+          ),
         ));
       }
-      block.add(pw.SizedBox(height: 6));
-      block.add(singleRule(width: 0.6));
-      // الفواتير القصيرة (بنود ودفعات قليلة) كتلة واحدة لا تنقسم بين صفحتين؛
-      // الطويلة تُترك عناصرها منفصلة ليتمكن الجدول من الانقسام
-      if (inv.items.length + invPays.length <= 8) {
-        body.add(pw.Inseparable(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: block)));
-      } else {
-        body.addAll(block);
-      }
     }
 
-    // دفعات على الحساب (غير مرتبطة بفاتورة)
+    // ---- دفعات على الحساب (غير مرتبطة بفاتورة)
     if (onAccount.isNotEmpty) {
-      body.add(pw.SizedBox(height: 12));
-      body.add(pw.Container(
-        padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: pw.BoxDecoration(color: O.headFill, border: pw.Border.all(color: O.line, width: 1.1)),
-        child: pw.Text('دفعات على الحساب (غير مخصصة لفاتورة)', style: a.t(11.4, color: O.brown, black: true)),
-      ));
-      body.add(pw.SizedBox(height: 5));
       var k = 0;
-      body.add(officialTable(columnWidths: {
-        0: const pw.FixedColumnWidth(26),
-        1: const pw.FixedColumnWidth(62),
-        2: const pw.FixedColumnWidth(72),
-        3: const pw.FixedColumnWidth(72),
-        4: const pw.FlexColumnWidth(),
-        5: const pw.FixedColumnWidth(84),
-      }, children: [
-        pw.TableRow(repeat: true, decoration: headDeco(), children: [
-          oth(a, 'م', size: 9.8),
-          oth(a, 'التاريخ', size: 9.8),
-          oth(a, 'السند', size: 9.8),
-          oth(a, 'الطريقة', size: 9.8),
-          oth(a, 'المرجع / ملاحظات', size: 9.8),
-          oth(a, 'المبلغ', size: 9.8),
-        ]),
-        for (final p in onAccount)
-          pw.TableRow(decoration: (++k).isEven ? const pw.BoxDecoration(color: O.zebra) : null, children: [
-            otd(a, '$k', size: 9.6, vPad: 6),
-            otd(a, fmtDate(p.date), size: 9.6, ltr: true, vPad: 6),
-            otd(a, p.receiptNumber, size: 9.4, ltr: true, vPad: 6),
-            otd(a, p.method, size: 9.6, vPad: 6),
-            otd(a, [p.reference, p.notes].where((e) => e.trim().isNotEmpty).join(' — '), align: pw.Alignment.centerRight, size: 9.4, vPad: 6),
-            otd(a, money(p.amount), size: 9.6, ltr: true, color: O.green, bold: true, vPad: 6),
+      final accTotal = onAccount.fold<int>(0, (x, p) => x + p.amount);
+      body.add(pw.SizedBox(height: 10));
+      body.add(pw.Inseparable(
+        child: pw.Container(
+          decoration: cardDeco(),
+          child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+            cardHeader([
+              pw.Text('دفعات على الحساب', style: a.t(11, color: O.brown, black: true)),
+              pw.Text('  (غير مخصصة لفاتورة محددة)', style: a.t(9.6, color: O.ink)),
+              pw.Spacer(),
+              pw.Text('${money(accTotal)} ر.س', style: a.t(10.4, color: O.green, black: true)),
+            ]),
+            pw.Padding(
+              padding: const pw.EdgeInsets.fromLTRB(8, 7, 8, 8),
+              child: officialTable(columnWidths: {
+                0: const pw.FixedColumnWidth(24),
+                1: const pw.FixedColumnWidth(60),
+                2: const pw.FixedColumnWidth(70),
+                3: const pw.FixedColumnWidth(70),
+                4: const pw.FlexColumnWidth(),
+                5: const pw.FixedColumnWidth(80),
+              }, children: [
+                pw.TableRow(decoration: headDeco(), children: [
+                  oth(a, 'م', size: 9.6),
+                  oth(a, 'التاريخ', size: 9.6),
+                  oth(a, 'السند', size: 9.6),
+                  oth(a, 'الطريقة', size: 9.6),
+                  oth(a, 'المرجع / ملاحظات', size: 9.6),
+                  oth(a, 'المبلغ', size: 9.6),
+                ]),
+                for (final p in onAccount)
+                  pw.TableRow(decoration: (++k).isEven ? const pw.BoxDecoration(color: O.zebra) : null, children: [
+                    otd(a, '$k', size: 9.4, ltr: true, vPad: 5),
+                    otd(a, fmtDate(p.date), size: 9.4, ltr: true, vPad: 5),
+                    otd(a, p.receiptNumber.isNotEmpty ? p.receiptNumber : '—', size: 9.2, ltr: true, vPad: 5),
+                    otd(a, p.method, size: 9.4, vPad: 5),
+                    otd(a, [p.reference, p.notes].where((e) => e.trim().isNotEmpty).join(' — '), align: pw.Alignment.centerRight, size: 9.2, vPad: 5),
+                    otd(a, money(p.amount), size: 9.4, ltr: true, color: O.green, bold: true, vPad: 5),
+                  ]),
+              ]),
+            ),
           ]),
-      ]));
+        ),
+      ));
     }
 
-    // الملخص العام
+    // ---- الملخص العام: حالة الفواتير (يمين) + معادلة الرصيد (يسار)
     final dueLabel = due > 0 ? 'الرصيد المستحق' : (due < 0 ? 'رصيد دائن للعميل' : 'الرصيد');
-    body.add(pw.Inseparable(child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
-      pw.SizedBox(height: 14),
-      pw.Row(children: [
-        pw.Spacer(),
-        pw.SizedBox(
-          width: 300,
-          child: pw.Column(children: [
-            pw.Text('ملخص الحساب', style: a.t(11.4, color: O.brown, black: true)),
-            pw.SizedBox(height: 6),
-            if (s.opening != 0) _soaLine('رصيد سابق قبل الفترة', '${s.opening < 0 ? '(${money(-s.opening)})' : money(s.opening)} ر.س'),
-            _soaLine('عدد الفواتير', '${s.count}'),
-            _soaLine('إجمالي الفواتير', '${money(s.billed)} ر.س'),
-            _soaLine('إجمالي المدفوعات', '${money(s.paid)} ر.س'),
-            pw.SizedBox(height: 2),
-            singleRule(width: 1.2),
-            pw.SizedBox(height: 8),
-            pw.Row(children: [
-              pw.Text(dueLabel, style: a.t(14.4, color: O.brown, black: true)),
-              pw.Spacer(),
-              pw.Text('${money(due.abs())} ر.س', style: a.t(14.4, color: due > 0 ? O.red : O.brown, black: true)),
-            ]),
+    final accTotal = onAccount.fold<int>(0, (x, p) => x + p.amount);
+    body.add(pw.SizedBox(height: 12));
+    body.add(pw.Inseparable(
+      child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+        pw.Container(
+          decoration: cardDeco(),
+          child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.stretch, children: [
+            cardHeader([pw.Text('ملخص الحساب', style: a.t(11.4, color: O.brown, black: true))]),
+            pw.Padding(
+              padding: const pw.EdgeInsets.fromLTRB(10, 8, 10, 10),
+              child: pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                // يمين: عدّاد الحالات
+                pw.Expanded(
+                  child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+                    _sumLine('عدد الفواتير خلال الفترة', '${s.count}', size: 10.2),
+                    _sumLine('مدفوعة بالكامل', '$cntPaid', size: 10.2, color: O.green),
+                    _sumLine('مدفوعة جزئيًا', '$cntPartial', size: 10.2, color: O.gold),
+                    _sumLine('غير مدفوعة', '$cntUnpaid', size: 10.2, color: O.red),
+                  ]),
+                ),
+                pw.SizedBox(width: 26),
+                // يسار: المعادلة
+                pw.SizedBox(
+                  width: 280,
+                  child: pw.Column(children: [
+                    if (s.opening != 0) _sumLine('رصيد سابق قبل الفترة', '${s.opening < 0 ? '(${money(-s.opening)})' : money(s.opening)} ر.س', size: 10.2),
+                    _sumLine('إجمالي الفواتير', '${money(s.billed)} ر.س', size: 10.2),
+                    if (sumDeposits > 0) _sumLine('العرابين المستلمة', '${money(sumDeposits)} ر.س', size: 10.2, color: O.green),
+                    if (sumPays > 0) _sumLine('الدفعات على الفواتير', '${money(sumPays)} ر.س', size: 10.2, color: O.green),
+                    if (accTotal > 0) _sumLine('دفعات على الحساب', '${money(accTotal)} ر.س', size: 10.2, color: O.green),
+                    _sumLine('إجمالي المدفوعات', '${money(s.paid)} ر.س', size: 10.2, bold: true, color: O.green),
+                    singleRule(width: 1.2),
+                    pw.SizedBox(height: 7),
+                    pw.Row(children: [
+                      pw.Text(dueLabel, style: a.t(14, color: O.brown, black: true)),
+                      pw.Spacer(),
+                      pw.Text('${money(due.abs())} ر.س', style: a.t(14, color: due > 0 ? O.red : O.brown, black: true)),
+                    ]),
+                    if (org.showTafqit && due != 0) pw.SizedBox(height: 3),
+                    if (org.showTafqit && due != 0)
+                      pw.Align(
+                        alignment: pw.Alignment.centerRight,
+                        child: pw.Text(tafqit(due.abs()), style: a.t(9.8, color: O.ink, bold: true)),
+                      ),
+                  ]),
+                ),
+              ]),
+            ),
           ]),
         ),
+        if (org.showTerms) pw.SizedBox(height: 8),
+        if (org.showTerms)
+          pw.Text(
+            due > 0
+                ? 'ملاحظة: نأمل تسوية الرصيد المستحق عبر التحويل البنكي على الحساب المذكور أدناه مع ذكر رقم الكشف. للاستفسار عن أي حركة يرجى التواصل معنا.'
+                : 'ملاحظة: حسابكم مسدَّد بالكامل حتى تاريخ هذا الكشف. نشكر لكم حسن تعاونكم.',
+            style: a.t(10, color: O.ink),
+          ),
+        pw.SizedBox(height: 10),
+        singleRule(),
+        pw.SizedBox(height: 14),
+        officialFooter(a, org, website: true),
       ]),
-      if (org.showTafqit && due != 0) pw.SizedBox(height: 4),
-      if (org.showTafqit && due != 0)
-        pw.Row(children: [
-          pw.Spacer(),
-          pw.SizedBox(width: 360, child: pw.Text(tafqit(due.abs()), style: a.t(11.2, color: O.ink, bold: true), textAlign: pw.TextAlign.right)),
-        ]),
-      if (org.showTerms) pw.SizedBox(height: 8),
-      if (org.showTerms)
-        pw.Text(
-          due > 0
-              ? 'ملاحظة: نأمل تسوية الرصيد المستحق عبر التحويل البنكي على الحساب المذكور أدناه مع ذكر رقم الكشف. للاستفسار عن أي حركة يرجى التواصل معنا.'
-              : 'ملاحظة: حسابكم مسدَّد بالكامل حتى تاريخ هذا الكشف. نشكر لكم حسن تعاونكم.',
-          style: a.t(10, color: O.ink),
-        ),
-      pw.SizedBox(height: 10),
-      singleRule(),
-      pw.SizedBox(height: 16),
-      officialFooter(a, org, website: true),
-    ])));
+    ));
 
     doc.addPage(pw.MultiPage(
       pageTheme: officialPageTheme(a, org, leaves: true),
@@ -697,9 +815,27 @@ class DocPdf {
     return doc.save();
   }
 
+  /// خلية الوصف بحجم مخصص (للكشف التفصيلي): السطر الأول عريض والبقية بشرطة — كالفاتورة تمامًا
+  pw.Widget _descCellSized(String desc, double first, double rest) {
+    final lines = desc.split('\n').map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+    if (lines.isEmpty) return otd(a, '', align: pw.Alignment.centerRight, size: first, vPad: 6);
+    return pw.Container(
+      alignment: pw.Alignment.centerRight,
+      padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+      child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        pw.Text(lines.first, style: a.t(first, color: O.ink, bold: true)),
+        for (final l in lines.skip(1))
+          pw.Padding(
+            padding: const pw.EdgeInsets.only(top: 2),
+            child: pw.Text(l.startsWith('-') ? l : '- $l', style: a.t(rest, color: O.ink)),
+          ),
+      ]),
+    );
+  }
+
   /// سطر في كتلة إجماليات الفاتورة داخل الكشف التفصيلي
   pw.Widget _dLine(String label, String value, {bool bold = false, PdfColor color = O.ink, bool top = false}) => pw.Container(
-        padding: const pw.EdgeInsets.symmetric(vertical: 3),
+        padding: const pw.EdgeInsets.symmetric(vertical: 3.2),
         decoration: top ? const pw.BoxDecoration(border: pw.Border(top: pw.BorderSide(color: O.gold, width: 0.8))) : null,
         child: pw.Row(children: [
           pw.Text(label, style: a.t(9.8, color: color, bold: bold)),

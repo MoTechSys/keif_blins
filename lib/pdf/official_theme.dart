@@ -199,12 +199,30 @@ pw.Widget otd(PdfAssets a, String t,
     );
 
 /// جدول يبدأ من اليمين مع حدود كاملة (pw.Table لا يحترم RTL فنعكس الخلايا والأعرض).
-pw.Table officialTable({required Map<int, pw.TableColumnWidth> columnWidths, required List<pw.TableRow> children}) {
+/// حدود داخلية فقط (للجداول المُدرجة داخل بطاقة مؤطَّرة)؛ [top]/[bottom] اختياريان
+pw.TableBorder innerBorder({double top = 0, double bottom = 0}) => pw.TableBorder(
+      top: top > 0 ? pw.BorderSide(color: O.line, width: top) : pw.BorderSide.none,
+      bottom: bottom > 0 ? pw.BorderSide(color: O.line, width: bottom) : pw.BorderSide.none,
+      horizontalInside: const pw.BorderSide(color: O.line, width: 0.85),
+      verticalInside: const pw.BorderSide(color: O.line, width: 0.85),
+    );
+
+/// إطار بطاقة موحّد (فاتورة داخل الكشف التفصيلي، دفعات على الحساب، ملخص)
+pw.BoxDecoration cardDeco() => pw.BoxDecoration(border: pw.Border.all(color: O.line, width: 1.1));
+
+/// شريط عنوان البطاقة (خلفية رأس الجدول + خط سفلي)
+pw.Widget cardHeader(List<pw.Widget> children) => pw.Container(
+      padding: const pw.EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      decoration: const pw.BoxDecoration(color: O.headFill, border: pw.Border(bottom: pw.BorderSide(color: O.line, width: 1.1))),
+      child: pw.Row(children: children),
+    );
+
+pw.Table officialTable({required Map<int, pw.TableColumnWidth> columnWidths, required List<pw.TableRow> children, pw.TableBorder? border}) {
   final n = children.first.children.length;
   final widths = <int, pw.TableColumnWidth>{};
   columnWidths.forEach((k, v) => widths[n - 1 - k] = v);
   return pw.Table(
-    border: tableBorder(),
+    border: border ?? tableBorder(),
     columnWidths: widths,
     defaultVerticalAlignment: pw.TableCellVerticalAlignment.middle,
     children: [
