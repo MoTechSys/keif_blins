@@ -29,6 +29,8 @@ void main() {
       expect(o.name, 'مؤسسة أصول الضيافة');
       expect(o.cr, isEmpty);
       expect(o.iban, isEmpty);
+    expect(o.phone, '0568997316');
+    expect(o.website, 'asoulaldiafa.com');
       expect(o.invoiceTerms, contains('أصول الضيافة'));
       expect(FileService.appFolder, 'أصول الضيافة');
       Brand.debugOverride = Brand.keif;

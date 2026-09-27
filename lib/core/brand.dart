@@ -81,8 +81,8 @@ class Brand {
     city: 'جدة',
   );
 
-  /// أصول الضيافة — البيانات الرسمية (السجل/البنك/التواصل) تُدخل من «بيانات المؤسسة»
-  /// ولا نخترعها: الحقول الفارغة لا تظهر في المستندات.
+  /// أصول الضيافة — البيانات من الموقع الرسمي asoulaldiafa.com (الشعار، البريد، الجوال).
+  /// السجل التجاري والبنك غير منشورة في الموقع: تُدخل من «بيانات المؤسسة» ولا نخترعها.
   static const osool = Brand._(
     id: 'osool',
     appName: 'أصول الضيافة',
@@ -90,11 +90,11 @@ class Brand {
     backupPrefix: 'osool',
     dbName: 'osool_diafa',
     orgName: 'مؤسسة أصول الضيافة',
-    orgNameEn: 'OSOOL ALDIAFA EST.',
+    orgNameEn: 'ASOUL ALDIAFA EST.',
     cr: '',
-    website: '',
-    email: '',
-    phone: '',
+    website: 'asoulaldiafa.com',
+    email: 'asoulaldiafa@gmail.com',
+    phone: '0568997316',
     bankName: '',
     bankAccount: '',
     iban: '',
