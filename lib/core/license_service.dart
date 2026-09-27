@@ -1,7 +1,7 @@
 /// license_service.dart — القفل عن بُعد (مفتاح إيقاف) | كيف الضيافة / أصول الضيافة
 ///
-/// ملف تحكم لكل تطبيق في مستودع GitHub:
-///   license/keif.json   و   license/osool.json
+/// مستودع التحكم (عام): github.com/MoTechSys/diafa-apps — مجلد لكل تطبيق:
+///   كيف الضيافة/license.json   و   أصول الضيافة/license.json
 ///   { "active": true|false, "code": "XXXX", "message": "..." }
 ///
 /// القواعد (مطابقة لمشروع Flutter-Native-App-022 مع تحسينات):
@@ -48,13 +48,24 @@ class LicenseService extends ChangeNotifier {
   static http.Client client = http.Client();
 
   static const owner = 'MoTechSys';
-  static const repo = 'keif_blins';
-  static String get file => 'license/${Brand.current.id}.json';
+  static const repo = 'diafa-apps';
 
-  static String get rawUrl =>
-      'https://raw.githubusercontent.com/$owner/$repo/main/$file';
-  static String get apiUrl =>
-      'https://api.github.com/repos/$owner/$repo/contents/$file?ref=main';
+  /// المسار داخل المستودع: <اسم المجلد العربي>/license.json
+  static List<String> get fileSegments => [
+    Brand.current.folderName,
+    'license.json',
+  ];
+
+  // Uri.https يرمّز الحروف العربية والمسافات بدقة
+  static Uri get rawUri => Uri.https(
+    'raw.githubusercontent.com',
+    '/$owner/$repo/main/${fileSegments.join('/')}',
+  );
+  static Uri get apiUri => Uri.https(
+    'api.github.com',
+    '/repos/$owner/$repo/contents/${fileSegments.join('/')}',
+    {'ref': 'main'},
+  );
 
   // مفاتيح منفصلة لكل تطبيق
   static String get _p => 'lic_${Brand.current.id}_';
@@ -212,8 +223,9 @@ class LicenseService extends ChangeNotifier {
     if (api != null) return api;
     try {
       final ts = DateTime.now().millisecondsSinceEpoch;
+      final u = rawUri.replace(queryParameters: {'nocache': '$ts'});
       final res = await client
-          .get(Uri.parse('$rawUrl?nocache=$ts'), headers: _noCache)
+          .get(u, headers: _noCache)
           .timeout(const Duration(seconds: 8));
       if (res.statusCode == 200) return _Remote(_decode(_utf8(res)));
       if (res.statusCode == 404) return _Remote.notFound();
@@ -225,7 +237,7 @@ class LicenseService extends ChangeNotifier {
     try {
       final res = await client
           .get(
-            Uri.parse(apiUrl),
+            apiUri,
             headers: {..._noCache, 'Accept': 'application/vnd.github+json'},
           )
           .timeout(const Duration(seconds: 8));

@@ -106,13 +106,19 @@ void main() {
     Brand.debugOverride = Brand.osool;
     LicenseService.client = fake(active: false, code: 'ASOUL-5689');
     expect((await LicenseService.check()).allowed, isFalse);
-    expect(hits.first.path, contains('license/osool.json'));
+    expect(
+      Uri.decodeFull(hits.first.path),
+      endsWith('/أصول الضيافة/license.json'),
+    );
     // كيف الضيافة لا يتأثر بقفل أصول الضيافة
     Brand.debugOverride = Brand.keif;
     hits.clear();
     LicenseService.client = fake(active: true);
     expect((await LicenseService.check()).allowed, isTrue);
-    expect(hits.first.path, contains('license/keif.json'));
+    expect(
+      Uri.decodeFull(hits.first.path),
+      endsWith('/كيف الضيافة/license.json'),
+    );
     final p = await SharedPreferences.getInstance();
     expect(p.getBool('lic_osool_blocked'), isTrue);
     expect(p.getBool('lic_keif_blocked'), isFalse);
