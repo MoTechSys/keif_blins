@@ -6,6 +6,8 @@ import 'package:keif_diafa/pdf/documents.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  // لا نعتمد على ترتيب تشغيل الملفات: pdf_test كان هو من ينشئ المجلد
+  setUpAll(() => Directory('build/test_pdfs').createSync(recursive: true));
   final org = Org();
   final client = Client(id: 'c1', name: 'عميل الضغط', phone: '0500000000');
 
