@@ -166,7 +166,8 @@ class _ClientFormState extends State<ClientForm> {
                   Field(
                     'ملاحظات داخلية',
                     controller: notes,
-                    maxLines: 2,
+                    minLines: 2,
+                    maxLines: null,
                     icon: Icons.notes_outlined,
                   ),
                 ],

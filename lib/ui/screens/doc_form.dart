@@ -277,7 +277,8 @@ class _DocFormState extends State<DocForm> {
                   Field(
                     'ملاحظات تظهر في المستند',
                     controller: notes,
-                    maxLines: 2,
+                    minLines: 2,
+                    maxLines: null,
                     icon: Icons.sticky_note_2_outlined,
                   ),
                   Field(
@@ -285,7 +286,8 @@ class _DocFormState extends State<DocForm> {
                         ? 'شروط العرض (فارغ = الافتراضي)'
                         : 'الشروط (فارغ = الافتراضي)',
                     controller: terms,
-                    maxLines: 3,
+                    minLines: 2,
+                    maxLines: null,
                     icon: Icons.gavel_outlined,
                   ),
                   _statusChips(),
@@ -646,15 +648,17 @@ class _DocFormState extends State<DocForm> {
             ),
             Field(
               'وصف الخدمة',
-              hint: 'مثال: خدمة ضيافة قهوة وشاي',
+              hint: 'مثال: ضيافة قهوة سعودية — كل سطر نقطة مستقلة',
               controller: c.desc,
-              maxLines: 2,
+              minLines: 2,
+              maxLines: null, // يتمدد مع النص: لا تمرير داخلي ولا ازدحام
               validator: (v) => (v ?? '').trim().isEmpty ? 'مطلوب' : null,
             ),
+            // السعر والكمية في صف، والوحدة شرائح أسفلها — لا قصّ على الشاشات الضيقة
             Row(
               children: [
                 Expanded(
-                  flex: 5,
+                  flex: 3,
                   child: Field(
                     'السعر (ر.س)',
                     controller: c.price,
@@ -662,9 +666,9 @@ class _DocFormState extends State<DocForm> {
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 10),
                 Expanded(
-                  flex: 3,
+                  flex: 2,
                   child: Field(
                     'الكمية',
                     controller: c.qty,
@@ -672,33 +676,41 @@ class _DocFormState extends State<DocForm> {
                     onChanged: (_) => setState(() {}),
                   ),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  flex: 4,
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: DropdownButtonFormField<String>(
-                      initialValue: unitLabels.contains(c.unit)
-                          ? c.unit
-                          : unitLabels.first,
-                      decoration: const InputDecoration(
-                        labelText: 'الوحدة',
-                        contentPadding: EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 14,
-                        ),
-                      ),
-                      dropdownColor: C.bg2,
-                      items: [
-                        for (final u in unitLabels)
-                          DropdownMenuItem(value: u, child: Text(u)),
-                      ],
-                      onChanged: (v) => setState(() => c.unit = v!),
-                    ),
-                  ),
-                ),
               ],
             ),
+            Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    'الوحدة:',
+                    style: TextStyle(
+                      color: C.text3,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  for (final u in {...unitLabels, c.unit})
+                    ChoiceChip(
+                      label: Text(u),
+                      selected: c.unit == u,
+                      visualDensity: VisualDensity.compact,
+                      labelStyle: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: c.unit == u ? C.onGold : C.text2,
+                      ),
+                      selectedColor: C.gold,
+                      showCheckmark: false,
+                      onSelected: (_) => setState(() => c.unit = u),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 4),
             // مشتريات خارجية — مخفية خلف زر صغير حتى لا تزدحم البطاقة
             if (c.extOpen || c.external.text.isNotEmpty)
               Field(

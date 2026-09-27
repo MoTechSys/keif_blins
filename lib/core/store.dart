@@ -539,15 +539,17 @@ class Store extends ChangeNotifier {
     if (p == null) return;
     payments.remove(p);
     trashPayments.add(p..deletedAt = DateTime.now().toIso8601String());
-    await _save('payments');
-    await _refreshInvoiceStatus(p.invoiceId);
+    await _savePaymentAndStatus(p.invoiceId);
   }
 
-  Future<void> _refreshInvoiceStatus(String invoiceId) async {
+  /// الدفعات + حالة الفاتورة المرتبطة في معاملة واحدة (لا حالة معلّقة لو انقطع التطبيق)
+  Future<void> _savePaymentAndStatus(String invoiceId) async {
     final inv = doc(invoiceId);
     if (inv != null && inv.countsInLedger) {
       inv.status = computeStatus(inv, payments).name;
-      await _save('docs');
+      await _saveAll(['payments', 'docs']);
+    } else {
+      await _save('payments');
     }
   }
 
@@ -727,8 +729,8 @@ class Store extends ChangeNotifier {
       trashPayments.remove(p);
       payments.add(p..deletedAt = '');
     }
+    if (d.countsInLedger) d.status = computeStatus(d, payments).name;
     await _saveAll(['clients', 'payments', 'docs']);
-    await _refreshInvoiceStatus(d.id);
   }
 
   Future<void> restorePayment(String id) async {
@@ -736,8 +738,7 @@ class Store extends ChangeNotifier {
     if (p == null) return;
     trashPayments.remove(p);
     payments.add(p..deletedAt = '');
-    await _save('payments');
-    await _refreshInvoiceStatus(p.invoiceId);
+    await _savePaymentAndStatus(p.invoiceId);
   }
 
   /// حذف نهائي لعنصر واحد

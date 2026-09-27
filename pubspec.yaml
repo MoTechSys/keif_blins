@@ -1,7 +1,7 @@
 name: keif_diafa
 description: كيف الضيافة — نظام الفواتير وكشوف الحساب
 publish_to: 'none'
-version: 2.3.0+5
+version: 2.4.0+6
 
 environment:
   sdk: ^3.9.0
@@ -32,6 +32,8 @@ dependencies:
   googleapis: 12.0.0
   extension_google_sign_in_as_googleapis_auth: 2.0.13
   http: 1.6.0
+  # حالة الترخيص (القفل عن بُعد) — مستقلة عن قاعدة البيانات
+  shared_preferences: 2.5.3
 
 # نسخة pdf 3.12.0 محلية مع تصحيح مسافات RTL — انظر third_party/pdf/KEIF_PATCH.md
 dependency_overrides:

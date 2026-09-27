@@ -63,100 +63,123 @@ class _SignInScreenState extends State<SignInScreen> {
           ),
         ),
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 30, 24, 24),
-            child: Column(
-              children: [
-                const Spacer(),
-                Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: [
-                        C.gold.withValues(alpha: 0.22),
-                        Colors.transparent,
+          child: LayoutBuilder(
+            builder: (context, box) => SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: box.maxHeight),
+                child: IntrinsicHeight(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 30, 24, 24),
+                    child: Column(
+                      children: [
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.all(18),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: RadialGradient(
+                              colors: [
+                                C.gold.withValues(alpha: 0.22),
+                                Colors.transparent,
+                              ],
+                            ),
+                          ),
+                          // الشعار بنص أبيض (كيف الضيافة / KEIF ALDIAFA) على الخلفية الداكنة؛ الأصلي على الفاتحة
+                          child: Image(
+                            image: AssetImage(
+                              C.isDark
+                                  ? Brand.current.logoLight
+                                  : Brand.current.logo,
+                            ),
+                            width: 150,
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        Text(
+                          Brand.current.orgName,
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.w900,
+                            color: C.text,
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'نظام الفواتير وكشوف الحساب وسندات القبض',
+                          style: TextStyle(
+                            color: C.text2,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const Spacer(),
+                        _Feature(
+                          Ic.invoice,
+                          'فواتير وعروض أسعار احترافية بضغطة',
+                        ),
+                        _Feature(
+                          Ic.statement,
+                          'كشوف حساب وسندات قبض جاهزة للمشاركة',
+                        ),
+                        _Feature(
+                          Ic.stamp,
+                          'بياناتك محفوظة على جهازك مع نسخ احتياطي',
+                        ),
+                        const Spacer(),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: FilledButton.icon(
+                            onPressed: _busy ? null : _google,
+                            icon: _busy
+                                ? SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: C.onGold,
+                                    ),
+                                  )
+                                : const _GoogleG(),
+                            label: const Text(
+                              'الدخول بحساب Google',
+                              style: TextStyle(
+                                fontSize: 15.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          width: double.infinity,
+                          height: 52,
+                          child: OutlinedButton.icon(
+                            onPressed: _busy ? null : _guest,
+                            icon: const Icon(
+                              Icons.arrow_back_rounded,
+                              size: 20,
+                            ),
+                            label: const Text(
+                              'المتابعة بدون تسجيل دخول',
+                              style: TextStyle(
+                                fontSize: 15.5,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        Text(
+                          'حساب Google يُستخدم للنسخ الاحتياطي اليومي إلى Google Drive فقط (مجلد خاص بالتطبيق). بياناتك الأصلية تبقى على جهازك.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: C.text3, fontSize: 11.5),
+                        ),
                       ],
                     ),
                   ),
-                  // الشعار بنص أبيض (كيف الضيافة / KEIF ALDIAFA) على الخلفية الداكنة؛ الأصلي على الفاتحة
-                  child: Image(
-                    image: AssetImage(
-                      C.isDark ? Brand.current.logoLight : Brand.current.logo,
-                    ),
-                    width: 150,
-                  ),
                 ),
-                const SizedBox(height: 18),
-                Text(
-                  Brand.current.orgName,
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w900,
-                    color: C.text,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'نظام الفواتير وكشوف الحساب وسندات القبض',
-                  style: TextStyle(
-                    color: C.text2,
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const Spacer(),
-                _Feature(Ic.invoice, 'فواتير وعروض أسعار احترافية بضغطة'),
-                _Feature(Ic.statement, 'كشوف حساب وسندات قبض جاهزة للمشاركة'),
-                _Feature(Ic.stamp, 'بياناتك محفوظة على جهازك مع نسخ احتياطي'),
-                const Spacer(),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: FilledButton.icon(
-                    onPressed: _busy ? null : _google,
-                    icon: _busy
-                        ? SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: C.onGold,
-                            ),
-                          )
-                        : const _GoogleG(),
-                    label: const Text(
-                      'الدخول بحساب Google',
-                      style: TextStyle(
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: OutlinedButton.icon(
-                    onPressed: _busy ? null : _guest,
-                    icon: const Icon(Icons.arrow_back_rounded, size: 20),
-                    label: const Text(
-                      'المتابعة بدون تسجيل دخول',
-                      style: TextStyle(
-                        fontSize: 15.5,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Text(
-                  'حساب Google يُستخدم للنسخ الاحتياطي اليومي إلى Google Drive فقط (مجلد خاص بالتطبيق). بياناتك الأصلية تبقى على جهازك.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: C.text3, fontSize: 11.5),
-                ),
-              ],
+              ),
             ),
           ),
         ),

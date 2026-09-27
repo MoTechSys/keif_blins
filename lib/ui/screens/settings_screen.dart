@@ -29,7 +29,7 @@ import 'lock_screen.dart';
    مركز الإعدادات (ملاحظة 4/12) — إعدادات حقيقية فقط
    ============================================================ */
 class SettingsHub extends StatelessWidget {
-  static const version = '2.3.0';
+  static const version = '2.4.0';
   const SettingsHub({super.key});
 
   @override
@@ -268,7 +268,9 @@ class _ElementsTab extends StatelessWidget {
               _check(
                 Ic.pin,
                 'السجل التجاري',
-                o.cr.isEmpty ? 'أدخل الرقم من «بيانات المؤسسة»' : 'س.ت ${o.cr}',
+                o.cr.isEmpty
+                    ? 'لا يوجد سجل — لا يظهر في المستندات (اختياري)'
+                    : 'س.ت ${o.cr}',
                 o.showCr,
                 (v) => store.saveOrg(o..showCr = v),
               ),
@@ -712,8 +714,18 @@ class _NumberingTabState extends State<_NumberingTab> {
           ),
         ),
         const SectionTitle('الشروط الافتراضية'),
-        Field('شروط الفاتورة', controller: c['invoiceTerms'], maxLines: 4),
-        Field('شروط عرض السعر', controller: c['quoteTerms'], maxLines: 4),
+        Field(
+          'شروط الفاتورة',
+          controller: c['invoiceTerms'],
+          minLines: 3,
+          maxLines: null,
+        ),
+        Field(
+          'شروط عرض السعر',
+          controller: c['quoteTerms'],
+          minLines: 3,
+          maxLines: null,
+        ),
         const SizedBox(height: 8),
         FilledButton.icon(
           onPressed: () async {
@@ -2033,7 +2045,8 @@ class _OrgFormState extends State<OrgForm> {
             children: [
               Expanded(
                 child: Field(
-                  'السجل التجاري',
+                  'السجل التجاري (اختياري)',
+                  hint: 'اتركه فارغًا إن لم يوجد',
                   controller: c['cr'],
                   type: TextInputType.number,
                   direction: TextDirection.ltr,

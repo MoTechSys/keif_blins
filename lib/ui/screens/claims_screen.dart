@@ -96,7 +96,7 @@ class _ClaimsScreenState extends State<ClaimsScreen> {
                   'المجموع: ',
                   style: TextStyle(color: C.muted, fontSize: 12.5),
                 ),
-                Money(total, size: 14),
+                Flexible(child: Money(total, size: 14)),
               ],
             ),
           ),
@@ -650,6 +650,7 @@ class _ClaimFormState extends State<ClaimForm> {
                   const SizedBox(width: 10),
                   Expanded(
                     child: DropdownButtonFormField<String>(
+                      isExpanded: true,
                       initialValue: c.status,
                       decoration: const InputDecoration(labelText: 'الحالة'),
                       dropdownColor: C.bg2,
@@ -720,8 +721,8 @@ class _ClaimFormState extends State<ClaimForm> {
                         color: C.text,
                       ),
                     ),
-                    const Spacer(),
-                    Money(total, size: 18),
+                    const SizedBox(width: 10),
+                    Expanded(child: Money(total, size: 18)),
                   ],
                 ),
               ),
@@ -772,7 +773,8 @@ class _ClaimFormState extends State<ClaimForm> {
               Field(
                 'ملاحظات أسفل الجدول (اختياري)',
                 controller: t['notes'],
-                maxLines: 2,
+                minLines: 2,
+                maxLines: null,
                 icon: Icons.notes_outlined,
               ),
 
@@ -801,7 +803,8 @@ class _ClaimFormState extends State<ClaimForm> {
                     Field(
                       'نص الخطاب',
                       controller: t['body'],
-                      maxLines: 9,
+                      minLines: 6,
+                      maxLines: null,
                       hint: 'سطر فارغ = فقرة جديدة',
                     ),
                     Padding(
@@ -811,7 +814,12 @@ class _ClaimFormState extends State<ClaimForm> {
                         style: TextStyle(color: C.text3, fontSize: 11.5),
                       ),
                     ),
-                    Field('الخاتمة', controller: t['closing'], maxLines: 4),
+                    Field(
+                      'الخاتمة',
+                      controller: t['closing'],
+                      minLines: 2,
+                      maxLines: null,
+                    ),
                     Row(
                       children: [
                         Expanded(
@@ -919,7 +927,12 @@ class _ClaimFormState extends State<ClaimForm> {
             ),
             Padding(
               padding: const EdgeInsets.only(left: 6),
-              child: Field('بيان الخدمة', controller: p.$1, maxLines: 3),
+              child: Field(
+                'بيان الخدمة',
+                controller: p.$1,
+                minLines: 2,
+                maxLines: null,
+              ),
             ),
             Padding(
               padding: const EdgeInsets.only(left: 6),

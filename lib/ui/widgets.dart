@@ -330,11 +330,14 @@ class SectionTitle extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Text(
-          title,
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+        Expanded(
+          child: Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+          ),
         ),
-        const Spacer(),
         if (action != null) action!,
       ],
     ),
@@ -437,7 +440,13 @@ class Money extends StatelessWidget {
     this.smart = true,
   }) : color = color ?? C.text;
   @override
-  Widget build(BuildContext context) => Text.rich(
+  Widget build(BuildContext context) => FittedBox(
+    fit: BoxFit.scaleDown,
+    alignment: AlignmentDirectional.centerEnd,
+    child: _text(),
+  );
+
+  Widget _text() => Text.rich(
     TextSpan(
       children: [
         TextSpan(
@@ -513,7 +522,10 @@ class Field extends StatelessWidget {
   final TextEditingController? controller;
   final String? hint;
   final TextInputType? type;
-  final int maxLines;
+
+  /// null = يتمدد الحقل مع النص بلا حد (للأوصاف الطويلة)
+  final int? maxLines;
+  final int? minLines;
   final IconData? icon;
   final String? Function(String?)? validator;
   final ValueChanged<String>? onChanged;
@@ -528,6 +540,7 @@ class Field extends StatelessWidget {
     this.hint,
     this.type,
     this.maxLines = 1,
+    this.minLines,
     this.icon,
     this.validator,
     this.onChanged,
@@ -541,8 +554,11 @@ class Field extends StatelessWidget {
     padding: const EdgeInsets.only(bottom: 12),
     child: TextFormField(
       controller: controller,
-      keyboardType: type,
+      keyboardType:
+          type ??
+          (maxLines == null || maxLines! > 1 ? TextInputType.multiline : null),
       maxLines: maxLines,
+      minLines: minLines,
       validator: validator,
       onChanged: onChanged,
       readOnly: readOnly,

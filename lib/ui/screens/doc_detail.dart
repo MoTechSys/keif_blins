@@ -423,15 +423,17 @@ class DocDetail extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 3),
         child: Row(
           children: [
-            Text(
-              l,
-              style: TextStyle(
-                color: color ?? (strong ? C.goldLight : C.muted),
-                fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
-                fontSize: strong ? 15 : 13,
+            Expanded(
+              child: Text(
+                l,
+                style: TextStyle(
+                  color: color ?? (strong ? C.goldLight : C.muted),
+                  fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
+                  fontSize: strong ? 15 : 13,
+                ),
               ),
             ),
-            const Spacer(),
+            const SizedBox(width: 8),
             Text(
               v,
               style: TextStyle(

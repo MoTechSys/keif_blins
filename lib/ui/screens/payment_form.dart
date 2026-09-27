@@ -104,6 +104,7 @@ class _PaymentFormState extends State<PaymentForm> {
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 110),
           children: [
             DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: store.clients.any((c) => c.id == p.clientId)
                   ? p.clientId
                   : (store.clients.isNotEmpty ? store.clients.first.id : null),
@@ -132,6 +133,7 @@ class _PaymentFormState extends State<PaymentForm> {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: openInvs.any((i) => i.id == p.invoiceId)
                   ? p.invoiceId
                   : '',
@@ -203,6 +205,7 @@ class _PaymentFormState extends State<PaymentForm> {
               ),
             ),
             DropdownButtonFormField<String>(
+              isExpanded: true,
               initialValue: payMethods.contains(p.method)
                   ? p.method
                   : payMethods.first,
@@ -240,7 +243,8 @@ class _PaymentFormState extends State<PaymentForm> {
                     'ملاحظات',
                     controller: notes,
                     icon: Icons.notes_outlined,
-                    maxLines: 2,
+                    minLines: 2,
+                    maxLines: null,
                   ),
                 ],
               ),

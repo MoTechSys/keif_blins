@@ -81,95 +81,108 @@ class _StorageSetupScreenState extends State<StorageSetupScreen>
     final b = Brand.current;
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(22, 26, 22, 20),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Center(
-                child: Image(
-                  image: AssetImage(C.isDark ? b.logoLight : b.logo),
-                  width: 110,
-                ),
-              ),
-              const SizedBox(height: 18),
-              Text(
-                'مجلد ${b.appName} على هاتفك',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w900,
-                  color: C.text,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'كل فاتورة أو عرض أو خطاب تُصدره يُحفظ فورًا ملف PDF في مجلد باسم التطبيق في الذاكرة الداخلية، مرتّبًا حسب النوع والسنة — تجده من «مدير الملفات» مباشرة.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: C.text2, fontSize: 13.5, height: 1.6),
-              ),
-              const SizedBox(height: 18),
-              GoldCard(
-                child: Directionality(
-                  textDirection: TextDirection.rtl,
+        child: LayoutBuilder(
+          builder: (context, box) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: box.maxHeight),
+              child: IntrinsicHeight(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 26, 22, 20),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      _row(
-                        Icons.folder_rounded,
-                        'الذاكرة الداخلية / ${b.folderName}',
-                        bold: true,
-                      ),
-                      for (final k in FileKind.values)
-                        _row(
-                          k == FileKind.backup
-                              ? Icons.backup_outlined
-                              : Icons.folder_open_rounded,
-                          '   ${k.folder}${k.byYear ? ' / ${DateTime.now().year}' : ''}',
+                      Center(
+                        child: Image(
+                          image: AssetImage(C.isDark ? b.logoLight : b.logo),
+                          width: 110,
                         ),
+                      ),
+                      const SizedBox(height: 18),
+                      Text(
+                        'مجلد ${b.appName} على هاتفك',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.w900,
+                          color: C.text,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'كل فاتورة أو عرض أو خطاب تُصدره يُحفظ فورًا ملف PDF في مجلد باسم التطبيق في الذاكرة الداخلية، مرتّبًا حسب النوع والسنة — تجده من «مدير الملفات» مباشرة.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: C.text2,
+                          fontSize: 13.5,
+                          height: 1.6,
+                        ),
+                      ),
+                      const SizedBox(height: 18),
+                      GoldCard(
+                        child: Directionality(
+                          textDirection: TextDirection.rtl,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _row(
+                                Icons.folder_rounded,
+                                'الذاكرة الداخلية / ${b.folderName}',
+                                bold: true,
+                              ),
+                              for (final k in FileKind.values)
+                                _row(
+                                  k == FileKind.backup
+                                      ? Icons.backup_outlined
+                                      : Icons.folder_open_rounded,
+                                  '   ${k.folder}${k.byYear ? ' / ${DateTime.now().year}' : ''}',
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'يطلب أندرويد لذلك صلاحية «الوصول إلى كل الملفات». التطبيق لا يقرأ ملفاتك الأخرى — يكتب فقط داخل مجلده.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: C.text3, fontSize: 11.5),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: 52,
+                        child: FilledButton.icon(
+                          onPressed: _busy ? null : _allow,
+                          icon: _busy
+                              ? SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: C.onGold,
+                                  ),
+                                )
+                              : const Icon(Icons.create_new_folder_rounded),
+                          label: const Text(
+                            'السماح وإنشاء المجلد',
+                            style: TextStyle(
+                              fontSize: 15.5,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: _busy ? null : _later,
+                        child: Text(
+                          'لاحقًا (الحفظ في مجلد Documents)',
+                          style: TextStyle(color: C.text3),
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
-              const Spacer(),
-              Text(
-                'يطلب أندرويد لذلك صلاحية «الوصول إلى كل الملفات». التطبيق لا يقرأ ملفاتك الأخرى — يكتب فقط داخل مجلده.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: C.text3, fontSize: 11.5),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                height: 52,
-                child: FilledButton.icon(
-                  onPressed: _busy ? null : _allow,
-                  icon: _busy
-                      ? SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: C.onGold,
-                          ),
-                        )
-                      : const Icon(Icons.create_new_folder_rounded),
-                  label: const Text(
-                    'السماح وإنشاء المجلد',
-                    style: TextStyle(
-                      fontSize: 15.5,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: _busy ? null : _later,
-                child: Text(
-                  'لاحقًا (الحفظ في مجلد Documents)',
-                  style: TextStyle(color: C.text3),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

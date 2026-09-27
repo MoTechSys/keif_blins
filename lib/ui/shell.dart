@@ -6,12 +6,14 @@ import 'package:provider/provider.dart';
 
 import '../core/brand.dart';
 import '../core/file_service.dart';
+import '../core/license_service.dart';
 import '../core/lock_service.dart';
 import '../core/store.dart';
 import 'drawer.dart';
 import 'screens/clients_screen.dart';
 import 'screens/docs_screen.dart';
 import 'screens/home_screen.dart';
+import 'screens/license_screen.dart';
 import 'screens/lock_screen.dart';
 import 'screens/signin_screen.dart';
 import 'screens/statements_screen.dart';
@@ -54,6 +56,7 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
         lock.onPaused();
       case AppLifecycleState.resumed:
         lock.onResumed();
+        context.read<LicenseService>().onResumed();
       case AppLifecycleState
           .inactive: // نوافذ النظام (المشاركة/الصلاحيات) لا تُقفل التطبيق
       case AppLifecycleState.detached:
@@ -71,9 +74,16 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     final storageAsked = context.select<Store, bool>(
       (s) => s.kv('storageAsked') == true,
     );
+    // القفل عن بُعد يسبق كل شيء (البيانات لا تُمس)
+    final licensed = context.select<LicenseService, bool>((l) => l.allowed);
+    if (!licensed) return const LicenseScreen();
     if (ready && lockReady && !signedIn) return const SignInScreen();
     // مرة واحدة على الهاتف: إنشاء مجلد التطبيق في جذر الذاكرة الداخلية
-    if (ready && lockReady && !locked && FileService.supported && !storageAsked) {
+    if (ready &&
+        lockReady &&
+        !locked &&
+        FileService.supported &&
+        !storageAsked) {
       return const StorageSetupScreen();
     }
     if (ready && lockReady && locked) return const LockScreen();

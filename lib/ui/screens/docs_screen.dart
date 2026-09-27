@@ -152,7 +152,9 @@ class _DocsScreenState extends State<DocsScreen>
 
   Widget _list(Store store, List<Invoice> all, bool isInv) {
     final list = all.where((d) {
-      if (_q.isNotEmpty && !d.number.contains(_q) && !d.clientName.contains(_q)) {
+      if (_q.isNotEmpty &&
+          !d.number.contains(_q) &&
+          !d.clientName.contains(_q)) {
         return false;
       }
       if (_filter == 'all') return true;
