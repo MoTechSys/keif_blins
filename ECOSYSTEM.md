@@ -24,7 +24,7 @@ diafa-signing-keys (خاص)
 | اسم الحزمة (**ثابت للأبد**) | `com.hospitalitybilling.keif_diafa` | `com.hospitalitybilling.osool_diafa` |
 | Flavor عند البناء | `keif` | `osool` |
 | مجلد التحكم في diafa-apps | `كيف الضيافة/` | `أصول الضيافة/` |
-| كود التفعيل الحالي | `KEIF-7310` | `ASOUL-5689` |
+| كود التفعيل | القيمة الحية دائمًا في `كيف الضيافة/license.json` | القيمة الحية دائمًا في `أصول الضيافة/license.json` |
 | ملف APK | `keif-aldiafa-vX.Y.Z-{arm64,armv7}.apk` | `asoul-aldiafa-vX.Y.Z-{arm64,armv7}.apk` |
 | الهوية | keifaldiafa.com · س.ت 4030499689 | asoulaldiafa.com · بلا سجل تجاري (يُخفى تلقائيًا) |
 
@@ -42,7 +42,7 @@ diafa-signing-keys (خاص)
 
 `diafa-apps/<المجلد>/license.json`:
 ```json
-{ "active": true, "code": "KEIF-7310", "message": "نص يظهر للمستخدم عند القفل" }
+{ "active": true, "code": "XXXX", "message": "نص يظهر للمستخدم عند القفل" }
 ```
 | الحالة | النتيجة |
 |---|---|
@@ -52,6 +52,7 @@ diafa-signing-keys (خاص)
 | حذف الملف (404) | قفل نهائي بلا كود — **فقط** إن سبق للتطبيق قراءة الملف مرة |
 | بلا إنترنت / ملف تالف / حد الطلبات | آخر حالة معروفة (لا قفل خاطئ) |
 
+- **الكود المرجعي هو ما في الملف** — المالك يغيّره متى شاء من واجهة GitHub؛ لا تنسخه إلى أي توثيق.
 - يُفحص عند التشغيل وعند الرجوع للتطبيق (فاصل أدنى 10 دقائق). البيانات لا تُمس أبدًا.
 - المصدر الأساسي GitHub Contents API (بلا كاش CDN)، والاحتياطي raw.githubusercontent.
 - الكود: `keif_blins/lib/core/license_service.dart` · الشاشة: `lib/ui/screens/license_screen.dart` · الاختبارات: `test/license_test.dart`.
