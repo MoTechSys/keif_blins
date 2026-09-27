@@ -1,20 +1,27 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:keif_diafa/core/models.dart';
 
-Invoice _inv({String id = 'i1', String client = 'c1', int deposit = 0, int vat = 1500, int discount = 0, String date = '2026-08-04', String status = 'issued'}) =>
-    Invoice(
-      id: id,
-      clientId: client,
-      issueDate: date,
-      status: status,
-      vatRateBp: vat,
-      discount: discount,
-      deposit: deposit,
-      items: [
-        LineItem(desc: 'قاعة', unitPrice: 1500000, qty: 1, external: 0),
-        LineItem(desc: 'بوفيه', unitPrice: 25000, qty: 120, external: 80000),
-      ],
-    );
+Invoice _inv({
+  String id = 'i1',
+  String client = 'c1',
+  int deposit = 0,
+  int vat = 1500,
+  int discount = 0,
+  String date = '2026-08-04',
+  String status = 'issued',
+}) => Invoice(
+  id: id,
+  clientId: client,
+  issueDate: date,
+  status: status,
+  vatRateBp: vat,
+  discount: discount,
+  deposit: deposit,
+  items: [
+    LineItem(desc: 'قاعة', unitPrice: 1500000, qty: 1, external: 0),
+    LineItem(desc: 'بوفيه', unitPrice: 25000, qty: 120, external: 80000),
+  ],
+);
 
 void main() {
   test('line item math', () {
@@ -42,7 +49,12 @@ void main() {
     final inv = _inv(deposit: 500000);
     final total = inv.totals.total;
     expect(computeStatus(inv, []), InvoiceStatus.partial);
-    expect(computeStatus(inv, [Payment(invoiceId: 'i1', clientId: 'c1', amount: total - 500000)]), InvoiceStatus.paid);
+    expect(
+      computeStatus(inv, [
+        Payment(invoiceId: 'i1', clientId: 'c1', amount: total - 500000),
+      ]),
+      InvoiceStatus.paid,
+    );
     expect(computeStatus(_inv(), []), InvoiceStatus.issued);
     expect(computeStatus(_inv(status: 'draft'), []), InvoiceStatus.draft);
     expect(invoiceRemaining(inv, []), total - 500000);
@@ -50,10 +62,18 @@ void main() {
 
   test('client summary excludes drafts and cancelled', () {
     final c = Client(id: 'c1', name: 'هنقرستيشن', openingBalance: 10000);
-    final docs = [_inv(id: 'a', deposit: 100000), _inv(id: 'b', status: 'draft'), _inv(id: 'c', status: 'cancelled')];
+    final docs = [
+      _inv(id: 'a', deposit: 100000),
+      _inv(id: 'b', status: 'draft'),
+      _inv(id: 'c', status: 'cancelled'),
+    ];
     final pays = [
       Payment(clientId: 'c1', invoiceId: 'a', amount: 50000),
-      Payment(clientId: 'c1', invoiceId: 'b', amount: 99999), // على مسودة — تُستثنى
+      Payment(
+        clientId: 'c1',
+        invoiceId: 'b',
+        amount: 99999,
+      ), // على مسودة — تُستثنى
       Payment(clientId: 'c1', invoiceId: '', amount: 20000), // على الحساب
     ];
     final s = clientSummary(c, docs, pays);
@@ -72,10 +92,28 @@ void main() {
       _inv(id: 'cur', date: '2026-08-04'),
     ];
     final pays = [
-      Payment(clientId: 'c1', invoiceId: 'old', amount: 100000, date: '2026-06-20'),
-      Payment(clientId: 'c1', invoiceId: 'cur', amount: 300000, date: '2026-08-10', receiptNumber: 'REC-0001'),
+      Payment(
+        clientId: 'c1',
+        invoiceId: 'old',
+        amount: 100000,
+        date: '2026-06-20',
+      ),
+      Payment(
+        clientId: 'c1',
+        invoiceId: 'cur',
+        amount: 300000,
+        date: '2026-08-10',
+        receiptNumber: 'REC-0001',
+      ),
     ];
-    final s = buildStatement(client: c, invoices: docs, payments: pays, from: '2026-08-01', to: '2026-08-31', number: 'SOA-202608-001');
+    final s = buildStatement(
+      client: c,
+      invoices: docs,
+      payments: pays,
+      from: '2026-08-01',
+      to: '2026-08-31',
+      number: 'SOA-202608-001',
+    );
     final oldTotal = docs[0].totals.total;
     expect(s.opening, 100000 + oldTotal - 200000 - 100000);
     expect(s.rows.length, 2); // فاتورة + دفعة
@@ -93,7 +131,12 @@ void main() {
   });
 
   test('quotation excluded from ledger and serializes', () {
-    final q = Invoice(kind: DocKind.quotation, clientId: 'c1', status: 'sent', items: [LineItem(desc: 'x', unitPrice: 100)]);
+    final q = Invoice(
+      kind: DocKind.quotation,
+      clientId: 'c1',
+      status: 'sent',
+      items: [LineItem(desc: 'x', unitPrice: 100)],
+    );
     expect(q.countsInLedger, false);
     final back = Invoice.fromMap(q.toMap());
     expect(back.isQuote, true);

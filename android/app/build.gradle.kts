@@ -40,6 +40,23 @@ android {
         versionName = flutter.versionName
     }
 
+    // نسختان مستقلتان تمامًا (تطبيقان منفصلان على الهاتف، بياناتهما لا تختلط):
+    //   flutter build apk --flavor keif  --dart-define=BRAND=keif
+    //   flutter build apk --flavor osool --dart-define=BRAND=osool
+    flavorDimensions += "brand"
+    productFlavors {
+        create("keif") {
+            dimension = "brand"
+            applicationId = "com.hospitalitybilling.keif_diafa"
+            resValue("string", "app_name", "كيف الضيافة")
+        }
+        create("osool") {
+            dimension = "brand"
+            applicationId = "com.hospitalitybilling.osool_diafa"
+            resValue("string", "app_name", "أصول الضيافة")
+        }
+    }
+
     signingConfigs {
         create("release") {
             if (keystorePropertiesFile.exists()) {

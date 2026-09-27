@@ -25,19 +25,31 @@ class DocDetail extends StatelessWidget {
   Widget build(BuildContext context) {
     final store = context.watch<Store>();
     final d = store.doc(id);
-    if (d == null) return const Scaffold(body: Center(child: Text('المستند غير موجود')));
+    if (d == null) {
+      return const Scaffold(body: Center(child: Text('المستند غير موجود')));
+    }
     final isQ = d.isQuote;
     final t = d.totals;
     final paid = isQ ? 0 : invoicePaid(d, store.payments);
     final rem = t.total - paid;
-    final pays = store.payments.where((p) => p.invoiceId == d.id).toList()..sort((a, b) => b.date.compareTo(a.date));
+    final pays = store.payments.where((p) => p.invoiceId == d.id).toList()
+      ..sort((a, b) => b.date.compareTo(a.date));
     final client = store.client(d.clientId);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(d.number),
         actions: [
-          IconButton(tooltip: 'تعديل', icon: const Icon(Icons.edit_outlined), onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DocForm(kind: d.kind, doc: d)))),
+          IconButton(
+            tooltip: 'تعديل',
+            icon: const Icon(Icons.edit_outlined),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => DocForm(kind: d.kind, doc: d),
+              ),
+            ),
+          ),
           PopupMenuButton<String>(
             onSelected: (v) async {
               switch (v) {
@@ -48,12 +60,25 @@ class DocDetail extends StatelessWidget {
                     ..issueDate = todayISO()
                     ..deposit = 0
                     ..convertedTo = ''
-                    ..status = isQ ? QuoteStatus.draft.name : InvoiceStatus.issued.name;
-                  c.items = d.items.map((e) => e.copy()..id = uid('li_')).toList();
+                    ..status = isQ
+                        ? QuoteStatus.draft.name
+                        : InvoiceStatus.issued.name;
+                  c.items = d.items
+                      .map((e) => e.copy()..id = uid('li_'))
+                      .toList();
                   await store.saveDoc(c);
-                  if (context.mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => DocDetail(id: c.id)));
+                  if (context.mounted) {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (_) => DocDetail(id: c.id)),
+                    );
+                  }
                 case 'del':
-                  if (await confirm(context, 'حذف ${isQ ? 'عرض السعر' : 'الفاتورة'}', 'سيُنقل المستند ${d.number} إلى سلة المحذوفات${isQ ? '' : ' مع الدفعات المرتبطة به'}، ويمكن استرجاعه خلال ${Store.trashDays} يومًا.')) {
+                  if (await confirm(
+                    context,
+                    'حذف ${isQ ? 'عرض السعر' : 'الفاتورة'}',
+                    'سيُنقل المستند ${d.number} إلى سلة المحذوفات${isQ ? '' : ' مع الدفعات المرتبطة به'}، ويمكن استرجاعه خلال ${Store.trashDays} يومًا.',
+                  )) {
                     await store.deleteDoc(d.id);
                     if (context.mounted) Navigator.pop(context);
                   }
@@ -61,201 +86,406 @@ class DocDetail extends StatelessWidget {
             },
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'dup', child: Text('نسخ كمستند جديد')),
-              PopupMenuItem(value: 'del', child: Text('نقل إلى سلة المحذوفات', style: TextStyle(color: C.red))),
+              PopupMenuItem(
+                value: 'del',
+                child: Text(
+                  'نقل إلى سلة المحذوفات',
+                  style: TextStyle(color: C.red),
+                ),
+              ),
             ],
           ),
         ],
       ),
-      body: ListView(padding: const EdgeInsets.fromLTRB(14, 4, 14, 30), children: [
-        // رأس
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            gradient: const LinearGradient(colors: [Color(0xFF1B2D5C), Color(0xFF13224A)]),
-            border: Border.all(color: C.gold.withValues(alpha: 0.6)),
-          ),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Row(children: [
-              Expanded(child: Text(d.clientName, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900))),
-              isQ ? StatusChip.quote(d.quoteStatus) : StatusChip.invoice(computeStatus(d, store.payments)),
-            ]),
-            const SizedBox(height: 4),
-            Text(
-              [
-                fmtDate(d.issueDate),
-                if (d.eventDate.isNotEmpty) 'المناسبة ${fmtDate(d.eventDate)}${d.eventDateTo.isNotEmpty && d.eventDateTo != d.eventDate ? ' → ${fmtDate(d.eventDateTo)}' : ''}',
-                if (d.location.isNotEmpty) d.location,
-                if (isQ && d.validUntil.isNotEmpty) 'ساري حتى ${fmtDate(d.validUntil)}',
-                if (d.isQuick) 'عرض سريع${d.quickPhone.trim().isNotEmpty ? ' • ${d.quickPhone.trim()}' : ''}',
-              ].join(' • '),
-              style: TextStyle(color: C.muted, fontSize: 12.5),
-            ),
-            const Divider(height: 22),
-            Row(children: [
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(isQ ? 'إجمالي العرض' : 'الإجمالي', style: TextStyle(color: C.goldLight, fontSize: 12, fontWeight: FontWeight.w700)),
-                  Money(t.total, size: 26),
-                ]),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(14, 4, 14, 30),
+        children: [
+          // رأس
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              gradient: const LinearGradient(
+                colors: [Color(0xFF1B2D5C), Color(0xFF13224A)],
               ),
-              if (!isQ)
-                Expanded(
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(rem > 0 ? 'المتبقي' : 'مسدَّدة', style: TextStyle(color: rem > 0 ? C.red : C.green, fontSize: 12, fontWeight: FontWeight.w700)),
-                    Money(rem, size: 22, color: rem > 0 ? C.red : C.green),
-                  ]),
-                ),
-            ]),
-          ]),
-        ),
-        const SizedBox(height: 12),
-
-        // أزرار المستند
-        Row(children: [
-          Expanded(
-            child: FilledButton.icon(
-              onPressed: () => _preview(context, d, store),
-              icon: const Icon(Icons.picture_as_pdf_rounded),
-              label: const Text('معاينة وطباعة ومشاركة'),
+              border: Border.all(color: C.gold.withValues(alpha: 0.6)),
             ),
-          ),
-        ]),
-        const SizedBox(height: 8),
-        Row(children: [
-          Expanded(
-            child: OutlinedButton.icon(
-              onPressed: () => runBusy(context, 'جارٍ تجهيز الملف…', () async {
-                final pdf = await DocPdf.create(store.org);
-                final bytes = await pdf.invoice(d, store.payments, client: client);
-                final name = store.docFileName(d);
-                final msg = ShareService.invoiceMessage(d, store.org, store.payments);
-                // حفظ نسخة في مجلد الهاتف ثم مشاركة الملف المحفوظ مباشرة
-                final saved = await FileService.savePdf(bytes, d.isQuote ? FileKind.quote : FileKind.invoice, name, year: FileService.yearOf(d.issueDate));
-                if (saved != null) {
-                  await FileService.share(saved, text: msg, subject: d.number);
-                } else {
-                  await ShareService.sharePdf(bytes, name, msg);
-                }
-              }),
-              icon: const Icon(Icons.share_rounded, size: 18),
-              label: const Text('مشاركة سريعة'),
-            ),
-          ),
-          const SizedBox(width: 8),
-          if (isQ && d.quoteStatus != QuoteStatus.converted)
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => _convert(context, d, store),
-                icon: const Icon(Icons.swap_horiz_rounded, size: 18),
-                label: const Text('تحويل لفاتورة'),
-              ),
-            )
-          else if (!isQ && d.countsInLedger && rem > 0)
-            Expanded(
-              child: OutlinedButton.icon(
-                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentForm(clientId: d.clientId, invoiceId: d.id, suggested: rem))),
-                icon: const Icon(Icons.payments_rounded, size: 18),
-                label: const Text('تسجيل دفعة'),
-              ),
-            )
-          else if (isQ)
-            Expanded(child: OutlinedButton.icon(onPressed: null, icon: const Icon(Icons.check, size: 18), label: Text('حُوّل إلى ${d.convertedTo}'))),
-        ]),
-
-        // البنود
-        const SectionTitle('البنود'),
-        GoldCard(
-          padding: EdgeInsets.zero,
-          child: Column(children: [
-            for (var i = 0; i < d.items.length; i++) ...[
-              if (i > 0) const Divider(),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Container(
-                    width: 24,
-                    height: 24,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(shape: BoxShape.circle, gradient: LinearGradient(colors: [C.goldDark, C.gold, C.goldLight])),
-                    child: Text('${i + 1}', style: TextStyle(color: C.bg, fontWeight: FontWeight.w900, fontSize: 12)),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(d.items[i].desc.split('\n').first, style: const TextStyle(fontWeight: FontWeight.w800)),
-                      Text(
-                        '${fmt(d.items[i].unitPrice, trimZeros: true)} × ${fmtQty(d.items[i].qty)} ${d.items[i].unitLabel}${d.items[i].external > 0 ? ' + مشتريات ${fmt(d.items[i].external, trimZeros: true)}' : ''}',
-                        style: TextStyle(color: C.muted, fontSize: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        d.clientName,
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
-                    ]),
-                  ),
-                  Money(d.items[i].total, size: 14),
-                ]),
+                    ),
+                    isQ
+                        ? StatusChip.quote(d.quoteStatus)
+                        : StatusChip.invoice(computeStatus(d, store.payments)),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  [
+                    fmtDate(d.issueDate),
+                    if (d.eventDate.isNotEmpty)
+                      'المناسبة ${fmtDate(d.eventDate)}${d.eventDateTo.isNotEmpty && d.eventDateTo != d.eventDate ? ' → ${fmtDate(d.eventDateTo)}' : ''}',
+                    if (d.location.isNotEmpty) d.location,
+                    if (isQ && d.validUntil.isNotEmpty)
+                      'ساري حتى ${fmtDate(d.validUntil)}',
+                    if (d.isQuick)
+                      'عرض سريع${d.quickPhone.trim().isNotEmpty ? ' • ${d.quickPhone.trim()}' : ''}',
+                  ].join(' • '),
+                  style: TextStyle(color: C.muted, fontSize: 12.5),
+                ),
+                const Divider(height: 22),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isQ ? 'إجمالي العرض' : 'الإجمالي',
+                            style: TextStyle(
+                              color: C.goldLight,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          Money(t.total, size: 26),
+                        ],
+                      ),
+                    ),
+                    if (!isQ)
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              rem > 0 ? 'المتبقي' : 'مسدَّدة',
+                              style: TextStyle(
+                                color: rem > 0 ? C.red : C.green,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                            Money(
+                              rem,
+                              size: 22,
+                              color: rem > 0 ? C.red : C.green,
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // أزرار المستند
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: () => _preview(context, d, store),
+                  icon: const Icon(Icons.picture_as_pdf_rounded),
+                  label: const Text('معاينة وطباعة ومشاركة'),
+                ),
               ),
             ],
-            const Divider(),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              child: Column(children: [
-                _sum('المجموع', fmt(t.subtotal)),
-                if (t.discount > 0) _sum('الخصم', '− ${fmt(t.discount)}', color: C.red),
-                if (t.vatRateBp > 0) _sum('الضريبة (${t.vatRateBp ~/ 100}%)', fmt(t.vat)),
-                _sum(isQ ? 'إجمالي العرض' : 'الإجمالي المستحق', fmtSAR(t.total), strong: true),
-                if (!isQ && d.deposit > 0) _sum('العربون', fmt(d.deposit), color: C.green),
-                if (!isQ && pays.isNotEmpty) _sum('دفعات مسجّلة', fmt(paid - d.deposit), color: C.green),
-              ]),
-            ),
-          ]),
-        ),
-
-        if (pays.isNotEmpty) ...[
-          const SectionTitle('الدفعات المرتبطة'),
-          for (final p in pays)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: GoldCard(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => PaymentForm(clientId: d.clientId, payment: p))),
-                child: Row(children: [
-                  Icon(Icons.payments_outlined, color: C.green, size: 20),
-                  const SizedBox(width: 10),
-                  Expanded(child: Text('${p.receiptNumber} • ${p.method} • ${fmtDate(p.date)}', style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700))),
-                  Money(p.amount, size: 14, color: C.green),
-                ]),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () => runBusy(
+                    context,
+                    'جارٍ تجهيز الملف…',
+                    () async {
+                      final pdf = await DocPdf.create(store.org);
+                      final bytes = await pdf.invoice(
+                        d,
+                        store.payments,
+                        client: client,
+                      );
+                      final name = store.docFileName(d);
+                      final msg = ShareService.invoiceMessage(
+                        d,
+                        store.org,
+                        store.payments,
+                      );
+                      // حفظ نسخة في مجلد الهاتف ثم مشاركة الملف المحفوظ مباشرة
+                      final saved = await FileService.savePdf(
+                        bytes,
+                        d.isQuote ? FileKind.quote : FileKind.invoice,
+                        name,
+                        year: FileService.yearOf(d.issueDate),
+                      );
+                      if (saved != null) {
+                        await FileService.share(
+                          saved,
+                          text: msg,
+                          subject: d.number,
+                        );
+                      } else {
+                        await ShareService.sharePdf(bytes, name, msg);
+                      }
+                    },
+                  ),
+                  icon: const Icon(Icons.share_rounded, size: 18),
+                  label: const Text('مشاركة سريعة'),
+                ),
               ),
+              const SizedBox(width: 8),
+              if (isQ && d.quoteStatus != QuoteStatus.converted)
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _convert(context, d, store),
+                    icon: const Icon(Icons.swap_horiz_rounded, size: 18),
+                    label: const Text('تحويل لفاتورة'),
+                  ),
+                )
+              else if (!isQ && d.countsInLedger && rem > 0)
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => PaymentForm(
+                          clientId: d.clientId,
+                          invoiceId: d.id,
+                          suggested: rem,
+                        ),
+                      ),
+                    ),
+                    icon: const Icon(Icons.payments_rounded, size: 18),
+                    label: const Text('تسجيل دفعة'),
+                  ),
+                )
+              else if (isQ)
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: null,
+                    icon: const Icon(Icons.check, size: 18),
+                    label: Text('حُوّل إلى ${d.convertedTo}'),
+                  ),
+                ),
+            ],
+          ),
+
+          // البنود
+          const SectionTitle('البنود'),
+          GoldCard(
+            padding: EdgeInsets.zero,
+            child: Column(
+              children: [
+                for (var i = 0; i < d.items.length; i++) ...[
+                  if (i > 0) const Divider(),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 10,
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 24,
+                          height: 24,
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: [C.goldDark, C.gold, C.goldLight],
+                            ),
+                          ),
+                          child: Text(
+                            '${i + 1}',
+                            style: TextStyle(
+                              color: C.bg,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                d.items[i].desc.split('\n').first,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              Text(
+                                '${fmt(d.items[i].unitPrice, trimZeros: true)} × ${fmtQty(d.items[i].qty)} ${d.items[i].unitLabel}${d.items[i].external > 0 ? ' + مشتريات ${fmt(d.items[i].external, trimZeros: true)}' : ''}',
+                                style: TextStyle(color: C.muted, fontSize: 12),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Money(d.items[i].total, size: 14),
+                      ],
+                    ),
+                  ),
+                ],
+                const Divider(),
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  child: Column(
+                    children: [
+                      _sum('المجموع', fmt(t.subtotal)),
+                      if (t.discount > 0)
+                        _sum('الخصم', '− ${fmt(t.discount)}', color: C.red),
+                      if (t.vatRateBp > 0)
+                        _sum('الضريبة (${t.vatRateBp ~/ 100}%)', fmt(t.vat)),
+                      _sum(
+                        isQ ? 'إجمالي العرض' : 'الإجمالي المستحق',
+                        fmtSAR(t.total),
+                        strong: true,
+                      ),
+                      if (!isQ && d.deposit > 0)
+                        _sum('العربون', fmt(d.deposit), color: C.green),
+                      if (!isQ && pays.isNotEmpty)
+                        _sum(
+                          'دفعات مسجّلة',
+                          fmt(paid - d.deposit),
+                          color: C.green,
+                        ),
+                    ],
+                  ),
+                ),
+              ],
             ),
+          ),
+
+          if (pays.isNotEmpty) ...[
+            const SectionTitle('الدفعات المرتبطة'),
+            for (final p in pays)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: GoldCard(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 10,
+                  ),
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          PaymentForm(clientId: d.clientId, payment: p),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.payments_outlined, color: C.green, size: 20),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '${p.receiptNumber} • ${p.method} • ${fmtDate(p.date)}',
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      Money(p.amount, size: 14, color: C.green),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+          if (d.notes.isNotEmpty) ...[
+            SectionTitle('ملاحظات'),
+            Text(d.notes, style: TextStyle(color: C.muted)),
+          ],
         ],
-        if (d.notes.isNotEmpty) ...[SectionTitle('ملاحظات'), Text(d.notes, style: TextStyle(color: C.muted))],
-      ]),
+      ),
     );
   }
 
-  Widget _sum(String l, String v, {bool strong = false, Color? color}) => Padding(
+  Widget _sum(String l, String v, {bool strong = false, Color? color}) =>
+      Padding(
         padding: const EdgeInsets.symmetric(vertical: 3),
-        child: Row(children: [
-          Text(l, style: TextStyle(color: color ?? (strong ? C.goldLight : C.muted), fontWeight: strong ? FontWeight.w800 : FontWeight.w600, fontSize: strong ? 15 : 13)),
-          const Spacer(),
-          Text(v, style: TextStyle(color: color ?? C.text, fontWeight: FontWeight.w800, fontSize: strong ? 16 : 13.5)),
-        ]),
+        child: Row(
+          children: [
+            Text(
+              l,
+              style: TextStyle(
+                color: color ?? (strong ? C.goldLight : C.muted),
+                fontWeight: strong ? FontWeight.w800 : FontWeight.w600,
+                fontSize: strong ? 15 : 13,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              v,
+              style: TextStyle(
+                color: color ?? C.text,
+                fontWeight: FontWeight.w800,
+                fontSize: strong ? 16 : 13.5,
+              ),
+            ),
+          ],
+        ),
       );
 
   /// تحويل العرض إلى فاتورة — العرض السريع يستلزم إنشاء عميل أولًا (ملاحظة 10)
   Future<void> _convert(BuildContext context, Invoice d, Store store) async {
     String? clientId;
     if (d.isQuick) {
-      final go = await confirm(context, 'تحويل إلى فاتورة', 'هذا عرض سريع بلا عميل مسجّل. سيُنشأ عميل جديد باسم «${store.docClientName(d)}» ${d.quickPhone.trim().isNotEmpty ? 'وجوال ${d.quickPhone.trim()} ' : ''}ثم تُنشأ الفاتورة باسمه.', ok: 'إنشاء العميل', danger: false);
+      final go = await confirm(
+        context,
+        'تحويل إلى فاتورة',
+        'هذا عرض سريع بلا عميل مسجّل. سيُنشأ عميل جديد باسم «${store.docClientName(d)}» ${d.quickPhone.trim().isNotEmpty ? 'وجوال ${d.quickPhone.trim()} ' : ''}ثم تُنشأ الفاتورة باسمه.',
+        ok: 'إنشاء العميل',
+        danger: false,
+      );
       if (!go || !context.mounted) return;
-      final c = await Navigator.push<Client>(context, MaterialPageRoute(builder: (_) => ClientForm(client: Client()..name = d.clientName.trim()..phone = d.quickPhone.trim())));
+      final c = await Navigator.push<Client>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ClientForm(
+            client: Client()
+              ..name = d.clientName.trim()
+              ..phone = d.quickPhone.trim(),
+          ),
+        ),
+      );
       if (c == null || !context.mounted) return;
       clientId = c.id;
     } else {
-      if (!await confirm(context, 'تحويل إلى فاتورة', 'سيتم إنشاء فاتورة جديدة بنفس البنود، ويُعلَّم العرض كمحوّل.', ok: 'تحويل', danger: false)) return;
+      if (!await confirm(
+        context,
+        'تحويل إلى فاتورة',
+        'سيتم إنشاء فاتورة جديدة بنفس البنود، ويُعلَّم العرض كمحوّل.',
+        ok: 'تحويل',
+        danger: false,
+      )) {
+        return;
+      }
     }
     final inv = await store.convertQuote(d, clientId: clientId);
     if (context.mounted) {
       toast(context, 'تم إنشاء الفاتورة ${inv.number}');
-      Navigator.push(context, MaterialPageRoute(builder: (_) => DocDetail(id: inv.id)));
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => DocDetail(id: inv.id)),
+      );
     }
   }
 
@@ -268,7 +498,9 @@ class DocDetail extends StatelessWidget {
           title: label,
           fileName: store.docFileName(d),
           message: ShareService.invoiceMessage(d, store.org, store.payments),
-          build: () async => (await DocPdf.create(store.org)).invoice(d, store.payments, client: store.client(d.clientId)),
+          build: () async => (await DocPdf.create(
+            store.org,
+          )).invoice(d, store.payments, client: store.client(d.clientId)),
           kind: d.isQuote ? FileKind.quote : FileKind.invoice,
           year: FileService.yearOf(d.issueDate),
         ),

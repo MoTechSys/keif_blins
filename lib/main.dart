@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 
+import 'core/brand.dart';
+import 'core/file_service.dart';
 import 'core/lock_service.dart';
 import 'core/store.dart';
 import 'ui/shell.dart';
@@ -14,6 +16,8 @@ void main() {
   // التهيئة غير محجوبة: الواجهة تعرض شاشة تحميل، وعند الفشل تعرض رسالة وزر "إعادة المحاولة"
   store.init();
   lock.init();
+  // إنشاء مجلد التطبيق وكل مجلدات الأصناف فور التشغيل (على الهاتف)
+  if (FileService.supported) FileService.base();
   runApp(KeifApp(store: store, lock: lock));
 }
 
@@ -31,7 +35,7 @@ class KeifApp extends StatelessWidget {
       ],
       child: Consumer<Store>(
         builder: (_, s, __) => MaterialApp(
-          title: 'كيف الضيافة',
+          title: Brand.current.appName,
           debugShowCheckedModeBanner: false,
           theme: buildTheme(AppTheme.fromKey(s.themeKey)),
           locale: const Locale('ar'),

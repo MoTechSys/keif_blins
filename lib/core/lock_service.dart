@@ -68,7 +68,8 @@ class LockService extends ChangeNotifier {
   void onResumed() {
     if (!enabled || _locked) return;
     final p = _pausedAt;
-    if (p != null && DateTime.now().difference(p).inSeconds >= relockAfterSeconds) {
+    if (p != null &&
+        DateTime.now().difference(p).inSeconds >= relockAfterSeconds) {
       _locked = true;
       notifyListeners();
     }
@@ -91,7 +92,9 @@ class LockService extends ChangeNotifier {
   }
 
   Future<void> setPin(String pin) async {
-    if (!isValidPin(pin)) throw ArgumentError('الرمز يجب أن يكون من 4 إلى 6 أرقام');
+    if (!isValidPin(pin)) {
+      throw ArgumentError('الرمز يجب أن يكون من 4 إلى 6 أرقام');
+    }
     final b = _box;
     if (b == null) throw StateError('تعذّر الوصول إلى صندوق الحماية');
     final salt = _newSalt();
@@ -137,7 +140,10 @@ class LockService extends ChangeNotifier {
     if (_failed >= 5) {
       // انتظار متصاعد: 30ث، 60ث، 120ث …
       final secs = 30 * (1 << min(_failed - 5, 4));
-      await _box?.put('cooldownUntil', DateTime.now().add(Duration(seconds: secs)).millisecondsSinceEpoch);
+      await _box?.put(
+        'cooldownUntil',
+        DateTime.now().add(Duration(seconds: secs)).millisecondsSinceEpoch,
+      );
     }
     notifyListeners();
     return false;

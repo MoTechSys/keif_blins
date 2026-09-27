@@ -4,7 +4,6 @@
 /// كحلي داكن + ذهبي دافئ + خط Tajawal.
 library;
 
-
 import 'package:flutter/material.dart';
 
 /* ============================================================
@@ -18,7 +17,10 @@ enum AppTheme {
   final String key, label, desc;
   const AppTheme(this.key, this.label, this.desc);
 
-  static AppTheme fromKey(String? k) => AppTheme.values.firstWhere((t) => t.key == k, orElse: () => AppTheme.night);
+  static AppTheme fromKey(String? k) => AppTheme.values.firstWhere(
+    (t) => t.key == k,
+    orElse: () => AppTheme.night,
+  );
 }
 
 /// لوحة ألوان ثيم واحد
@@ -131,10 +133,10 @@ class Palette {
   );
 
   static Palette of(AppTheme t) => switch (t) {
-        AppTheme.night => night,
-        AppTheme.dawn => dawn,
-        AppTheme.charcoal => charcoal,
-      };
+    AppTheme.night => night,
+    AppTheme.dawn => dawn,
+    AppTheme.charcoal => charcoal,
+  };
 }
 
 /* ============================================================
@@ -179,17 +181,17 @@ class C {
 
   /// تدرّج ذهبي معياري (أزرار/شارات)
   static LinearGradient get goldGradient => LinearGradient(
-        colors: [p.gold2, p.gold, p.goldDeep],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
+    colors: [p.gold2, p.gold, p.goldDeep],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 
   /// تدرّج البطاقات (surface → surface2)
   static LinearGradient get cardGradient => LinearGradient(
-        colors: [p.surface, p.surface2],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      );
+    colors: [p.surface, p.surface2],
+    begin: Alignment.topLeft,
+    end: Alignment.bottomRight,
+  );
 }
 
 /* ============================================================
@@ -198,23 +200,30 @@ class C {
 ThemeData buildTheme([AppTheme t = AppTheme.night]) {
   final p = Palette.of(t);
   C.p = p;
-  final base = p.dark ? ThemeData.dark(useMaterial3: true) : ThemeData.light(useMaterial3: true);
-  final scheme = (p.dark ? const ColorScheme.dark() : const ColorScheme.light()).copyWith(
-    primary: p.gold,
-    onPrimary: p.onGold,
-    secondary: p.gold2,
-    onSecondary: p.onGold,
-    surface: p.surface,
-    onSurface: p.text,
-    surfaceContainerHighest: p.surface3,
-    onSurfaceVariant: p.text2,
-    outline: p.line,
-    outlineVariant: p.line2,
-    error: p.danger,
-    onError: Colors.white,
-  );
+  final base = p.dark
+      ? ThemeData.dark(useMaterial3: true)
+      : ThemeData.light(useMaterial3: true);
+  final scheme = (p.dark ? const ColorScheme.dark() : const ColorScheme.light())
+      .copyWith(
+        primary: p.gold,
+        onPrimary: p.onGold,
+        secondary: p.gold2,
+        onSecondary: p.onGold,
+        surface: p.surface,
+        onSurface: p.text,
+        surfaceContainerHighest: p.surface3,
+        onSurfaceVariant: p.text2,
+        outline: p.line,
+        outlineVariant: p.line2,
+        error: p.danger,
+        onError: Colors.white,
+      );
   const font = 'Tajawal';
-  final txt = base.textTheme.apply(fontFamily: font, bodyColor: p.text, displayColor: p.text);
+  final txt = base.textTheme.apply(
+    fontFamily: font,
+    bodyColor: p.text,
+    displayColor: p.text,
+  );
 
   return base.copyWith(
     colorScheme: scheme,
@@ -230,48 +239,88 @@ ThemeData buildTheme([AppTheme t = AppTheme.night]) {
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
-      titleTextStyle: TextStyle(fontFamily: font, fontSize: 19, fontWeight: FontWeight.w800, color: p.text),
+      titleTextStyle: TextStyle(
+        fontFamily: font,
+        fontSize: 19,
+        fontWeight: FontWeight.w800,
+        color: p.text,
+      ),
       iconTheme: IconThemeData(color: p.goldInk),
     ),
     drawerTheme: DrawerThemeData(
       backgroundColor: p.bg2,
       surfaceTintColor: Colors.transparent,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.horizontal(right: Radius.circular(22))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.horizontal(right: Radius.circular(22)),
+      ),
     ),
     cardTheme: CardThemeData(
       color: p.surface,
       elevation: 0,
       margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: BorderSide(color: p.line2)),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: p.line2),
+      ),
     ),
     dialogTheme: DialogThemeData(
       backgroundColor: p.bg2,
       surfaceTintColor: Colors.transparent,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-      titleTextStyle: TextStyle(fontFamily: font, fontSize: 18, fontWeight: FontWeight.w800, color: p.text),
-      contentTextStyle: TextStyle(fontFamily: font, fontSize: 14.5, color: p.text2, height: 1.6),
+      titleTextStyle: TextStyle(
+        fontFamily: font,
+        fontSize: 18,
+        fontWeight: FontWeight.w800,
+        color: p.text,
+      ),
+      contentTextStyle: TextStyle(
+        fontFamily: font,
+        fontSize: 14.5,
+        color: p.text2,
+        height: 1.6,
+      ),
     ),
     bottomSheetTheme: BottomSheetThemeData(
       backgroundColor: p.bg2,
       surfaceTintColor: Colors.transparent,
       showDragHandle: true,
       dragHandleColor: p.text3,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
       fillColor: p.dark ? p.bg2 : p.surface,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       labelStyle: TextStyle(color: p.text2, fontWeight: FontWeight.w600),
-      floatingLabelStyle: TextStyle(color: p.goldInk, fontWeight: FontWeight.w800),
+      floatingLabelStyle: TextStyle(
+        color: p.goldInk,
+        fontWeight: FontWeight.w800,
+      ),
       hintStyle: TextStyle(color: p.text3, fontWeight: FontWeight.w500),
       prefixIconColor: p.text3,
       suffixIconColor: p.text3,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: p.line)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: p.line)),
-      focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: p.gold, width: 1.6)),
-      errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: p.danger)),
-      focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: p.danger, width: 1.6)),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: p.line),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: p.line),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: p.gold, width: 1.6),
+      ),
+      errorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: p.danger),
+      ),
+      focusedErrorBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(14),
+        borderSide: BorderSide(color: p.danger, width: 1.6),
+      ),
     ),
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
@@ -280,7 +329,11 @@ ThemeData buildTheme([AppTheme t = AppTheme.night]) {
         minimumSize: const Size(0, 50),
         padding: const EdgeInsets.symmetric(horizontal: 22),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        textStyle: const TextStyle(fontFamily: font, fontSize: 15, fontWeight: FontWeight.w800),
+        textStyle: const TextStyle(
+          fontFamily: font,
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(
@@ -289,8 +342,15 @@ ThemeData buildTheme([AppTheme t = AppTheme.night]) {
         foregroundColor: p.text,
         elevation: 0,
         minimumSize: const Size(0, 50),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: p.line)),
-        textStyle: const TextStyle(fontFamily: font, fontSize: 15, fontWeight: FontWeight.w800),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(14),
+          side: BorderSide(color: p.line),
+        ),
+        textStyle: const TextStyle(
+          fontFamily: font,
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -300,21 +360,39 @@ ThemeData buildTheme([AppTheme t = AppTheme.night]) {
         padding: const EdgeInsets.symmetric(horizontal: 18),
         side: BorderSide(color: p.gold.withValues(alpha: 0.6)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        textStyle: const TextStyle(fontFamily: font, fontSize: 15, fontWeight: FontWeight.w800),
+        textStyle: const TextStyle(
+          fontFamily: font,
+          fontSize: 15,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
         foregroundColor: p.goldInk,
-        textStyle: const TextStyle(fontFamily: font, fontWeight: FontWeight.w800),
+        textStyle: const TextStyle(
+          fontFamily: font,
+          fontWeight: FontWeight.w800,
+        ),
       ),
     ),
-    iconButtonTheme: IconButtonThemeData(style: IconButton.styleFrom(foregroundColor: p.text2)),
+    iconButtonTheme: IconButtonThemeData(
+      style: IconButton.styleFrom(foregroundColor: p.text2),
+    ),
     listTileTheme: ListTileThemeData(
       iconColor: p.goldInk,
       textColor: p.text,
-      titleTextStyle: TextStyle(fontFamily: font, fontSize: 15, fontWeight: FontWeight.w700, color: p.text),
-      subtitleTextStyle: TextStyle(fontFamily: font, fontSize: 12.5, color: p.text3),
+      titleTextStyle: TextStyle(
+        fontFamily: font,
+        fontSize: 15,
+        fontWeight: FontWeight.w700,
+        color: p.text,
+      ),
+      subtitleTextStyle: TextStyle(
+        fontFamily: font,
+        fontSize: 12.5,
+        color: p.text3,
+      ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
     ),
     navigationBarTheme: NavigationBarThemeData(
@@ -333,7 +411,11 @@ ThemeData buildTheme([AppTheme t = AppTheme.night]) {
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: p.dark ? p.surface3 : const Color(0xFF1E2A4A),
-      contentTextStyle: const TextStyle(fontFamily: font, color: Color(0xFFEEF2F8), fontWeight: FontWeight.w700),
+      contentTextStyle: const TextStyle(
+        fontFamily: font,
+        color: Color(0xFFEEF2F8),
+        fontWeight: FontWeight.w700,
+      ),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
     ),
@@ -341,40 +423,76 @@ ThemeData buildTheme([AppTheme t = AppTheme.night]) {
       backgroundColor: p.surface2,
       selectedColor: p.gold.withValues(alpha: 0.22),
       side: BorderSide(color: p.line),
-      labelStyle: TextStyle(fontFamily: font, color: p.text, fontWeight: FontWeight.w700, fontSize: 12.5),
+      labelStyle: TextStyle(
+        fontFamily: font,
+        color: p.text,
+        fontWeight: FontWeight.w700,
+        fontSize: 12.5,
+      ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
     ),
     switchTheme: SwitchThemeData(
-      thumbColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? p.onGold : p.text3),
-      trackColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? p.gold : p.surface3),
+      thumbColor: WidgetStateProperty.resolveWith(
+        (s) => s.contains(WidgetState.selected) ? p.onGold : p.text3,
+      ),
+      trackColor: WidgetStateProperty.resolveWith(
+        (s) => s.contains(WidgetState.selected) ? p.gold : p.surface3,
+      ),
       trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
     ),
     checkboxTheme: CheckboxThemeData(
-      fillColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? p.gold : Colors.transparent),
+      fillColor: WidgetStateProperty.resolveWith(
+        (s) => s.contains(WidgetState.selected) ? p.gold : Colors.transparent,
+      ),
       checkColor: WidgetStateProperty.all(p.onGold),
       side: BorderSide(color: p.text3, width: 1.6),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6)),
     ),
-    radioTheme: RadioThemeData(fillColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? p.gold : p.text3)),
+    radioTheme: RadioThemeData(
+      fillColor: WidgetStateProperty.resolveWith(
+        (s) => s.contains(WidgetState.selected) ? p.gold : p.text3,
+      ),
+    ),
     popupMenuTheme: PopupMenuThemeData(
       color: p.bg2,
       surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14), side: BorderSide(color: p.line)),
-      textStyle: TextStyle(fontFamily: font, color: p.text, fontWeight: FontWeight.w700),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: p.line),
+      ),
+      textStyle: TextStyle(
+        fontFamily: font,
+        color: p.text,
+        fontWeight: FontWeight.w700,
+      ),
     ),
     dropdownMenuTheme: DropdownMenuThemeData(
-      menuStyle: MenuStyle(backgroundColor: WidgetStateProperty.all(p.bg2), surfaceTintColor: WidgetStateProperty.all(Colors.transparent)),
+      menuStyle: MenuStyle(
+        backgroundColor: WidgetStateProperty.all(p.bg2),
+        surfaceTintColor: WidgetStateProperty.all(Colors.transparent),
+      ),
     ),
-    progressIndicatorTheme: ProgressIndicatorThemeData(color: p.gold, linearTrackColor: p.surface3),
+    progressIndicatorTheme: ProgressIndicatorThemeData(
+      color: p.gold,
+      linearTrackColor: p.surface3,
+    ),
     dividerTheme: DividerThemeData(color: p.line2, thickness: 1, space: 1),
     tabBarTheme: TabBarThemeData(
       labelColor: p.goldInk,
       unselectedLabelColor: p.text3,
       indicatorColor: p.gold,
       dividerColor: p.line2,
-      labelStyle: const TextStyle(fontFamily: font, fontWeight: FontWeight.w800, fontSize: 14),
-      unselectedLabelStyle: const TextStyle(fontFamily: font, fontWeight: FontWeight.w700, fontSize: 14),
+      labelStyle: const TextStyle(
+        fontFamily: font,
+        fontWeight: FontWeight.w800,
+        fontSize: 14,
+      ),
+      unselectedLabelStyle: const TextStyle(
+        fontFamily: font,
+        fontWeight: FontWeight.w700,
+        fontSize: 14,
+      ),
     ),
     segmentedButtonTheme: SegmentedButtonThemeData(
       style: SegmentedButton.styleFrom(
@@ -383,7 +501,11 @@ ThemeData buildTheme([AppTheme t = AppTheme.night]) {
         selectedForegroundColor: p.onGold,
         foregroundColor: p.text2,
         side: BorderSide(color: p.line),
-        textStyle: const TextStyle(fontFamily: font, fontWeight: FontWeight.w800, fontSize: 13),
+        textStyle: const TextStyle(
+          fontFamily: font,
+          fontWeight: FontWeight.w800,
+          fontSize: 13,
+        ),
       ),
     ),
     datePickerTheme: DatePickerThemeData(
@@ -391,8 +513,12 @@ ThemeData buildTheme([AppTheme t = AppTheme.night]) {
       surfaceTintColor: Colors.transparent,
       headerBackgroundColor: p.surface2,
       headerForegroundColor: p.text,
-      dayForegroundColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? p.onGold : p.text),
-      dayBackgroundColor: WidgetStateProperty.resolveWith((s) => s.contains(WidgetState.selected) ? p.gold : Colors.transparent),
+      dayForegroundColor: WidgetStateProperty.resolveWith(
+        (s) => s.contains(WidgetState.selected) ? p.onGold : p.text,
+      ),
+      dayBackgroundColor: WidgetStateProperty.resolveWith(
+        (s) => s.contains(WidgetState.selected) ? p.gold : Colors.transparent,
+      ),
       todayForegroundColor: WidgetStateProperty.all(p.goldInk),
       todayBorder: BorderSide(color: p.gold),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
@@ -402,12 +528,12 @@ ThemeData buildTheme([AppTheme t = AppTheme.night]) {
 
 /// خط الأرقام المالية (أرقام ثابتة العرض)
 TextStyle moneyStyle(double size, {Color? color}) => TextStyle(
-      fontSize: size,
-      fontWeight: FontWeight.w900,
-      color: color ?? C.text,
-      height: 1.1,
-      fontFeatures: const [FontFeature.tabularFigures()],
-    );
+  fontSize: size,
+  fontWeight: FontWeight.w900,
+  color: color ?? C.text,
+  height: 1.1,
+  fontFeatures: const [FontFeature.tabularFigures()],
+);
 
 /* ============================================================
    ألوان الألواح ثلاثية الأبعاد (premium.css .plate--*)
@@ -418,19 +544,55 @@ class PlateTones {
   final Color top, body, bottom, glow, ink;
   const PlateTones(this.top, this.body, this.bottom, this.glow, this.ink);
 
-  static const gold = PlateTones(Color(0xFFF0CF9A), Color(0xFFC8944F), Color(0xFF7C5322), Color(0xFF96682C), Color(0xFF3B2708));
-  static const blue = PlateTones(Color(0xFF8FC4F6), Color(0xFF2E76CC), Color(0xFF123C77), Color(0xFF2666BE), Color(0xFF06203A));
-  static const green = PlateTones(Color(0xFF79E2B6), Color(0xFF19A46E), Color(0xFF0A5236), Color(0xFF168C5E), Color(0xFF04281A));
-  static const violet = PlateTones(Color(0xFFC3A5FA), Color(0xFF7245D2), Color(0xFF361E74), Color(0xFF603CBE), Color(0xFF180938));
-  static const silver = PlateTones(Color(0xFFEDF2F8), Color(0xFFAEB9C8), Color(0xFF5F6C7E), Color(0xFF465468), Color(0xFF141C2A));
-  static const red = PlateTones(Color(0xFFFFB3A6), Color(0xFFE05A4C), Color(0xFF7A2118), Color(0xFFB43A2E), Color(0xFF3A0C08));
+  static const gold = PlateTones(
+    Color(0xFFF0CF9A),
+    Color(0xFFC8944F),
+    Color(0xFF7C5322),
+    Color(0xFF96682C),
+    Color(0xFF3B2708),
+  );
+  static const blue = PlateTones(
+    Color(0xFF8FC4F6),
+    Color(0xFF2E76CC),
+    Color(0xFF123C77),
+    Color(0xFF2666BE),
+    Color(0xFF06203A),
+  );
+  static const green = PlateTones(
+    Color(0xFF79E2B6),
+    Color(0xFF19A46E),
+    Color(0xFF0A5236),
+    Color(0xFF168C5E),
+    Color(0xFF04281A),
+  );
+  static const violet = PlateTones(
+    Color(0xFFC3A5FA),
+    Color(0xFF7245D2),
+    Color(0xFF361E74),
+    Color(0xFF603CBE),
+    Color(0xFF180938),
+  );
+  static const silver = PlateTones(
+    Color(0xFFEDF2F8),
+    Color(0xFFAEB9C8),
+    Color(0xFF5F6C7E),
+    Color(0xFF465468),
+    Color(0xFF141C2A),
+  );
+  static const red = PlateTones(
+    Color(0xFFFFB3A6),
+    Color(0xFFE05A4C),
+    Color(0xFF7A2118),
+    Color(0xFFB43A2E),
+    Color(0xFF3A0C08),
+  );
 
   static PlateTones of(PlateColor c) => switch (c) {
-        PlateColor.gold => gold,
-        PlateColor.blue => blue,
-        PlateColor.green => green,
-        PlateColor.violet => violet,
-        PlateColor.silver => silver,
-        PlateColor.red => red,
-      };
+    PlateColor.gold => gold,
+    PlateColor.blue => blue,
+    PlateColor.green => green,
+    PlateColor.violet => violet,
+    PlateColor.silver => silver,
+    PlateColor.red => red,
+  };
 }

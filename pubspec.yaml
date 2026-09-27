@@ -1,7 +1,7 @@
 name: keif_diafa
 description: كيف الضيافة — نظام الفواتير وكشوف الحساب
 publish_to: 'none'
-version: 2.2.0+4
+version: 2.3.0+5
 
 environment:
   sdk: ^3.9.0
@@ -24,6 +24,14 @@ dependencies:
   permission_handler: ^11.3.1
   google_sign_in: 6.2.2
   url_launcher: 6.3.1
+  # قاعدة البيانات: SQLite (WAL + معاملات) على أندرويد — Hive يبقى للويب ولترحيل البيانات القديمة
+  sqflite: 2.4.2
+  sqflite_common: 2.5.6
+  path: 1.9.1
+  # النسخ السحابي إلى Google Drive
+  googleapis: 12.0.0
+  extension_google_sign_in_as_googleapis_auth: 2.0.13
+  http: 1.6.0
 
 # نسخة pdf 3.12.0 محلية مع تصحيح مسافات RTL — انظر third_party/pdf/KEIF_PATCH.md
 dependency_overrides:
@@ -34,12 +42,15 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
+  sqflite_common_ffi: 2.3.7+1
 
 flutter:
   uses-material-design: true
   assets:
     - assets/img/
-    - assets/img/pdf/
+    # هوية كل نسخة (شعار/ختم للواجهة و PDF) — الاختيار في lib/core/brand.dart
+    - assets/brand/keif/
+    - assets/brand/osool/
     - assets/ic/
     - assets/fonts/
   fonts:

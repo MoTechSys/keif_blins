@@ -1,7 +1,6 @@
 /// share_service.dart — الطباعة والمشاركة (PDF + رسالة) | كيف الضيافة
 library;
 
-
 import 'package:flutter/foundation.dart';
 import 'package:printing/printing.dart';
 import 'package:share_plus/share_plus.dart';
@@ -21,9 +20,17 @@ class ShareService {
         ..writeln()
         ..writeln('يسعدنا في *${org.name}* تقديم عرض السعر رقم *${inv.number}*')
         ..writeln('التاريخ: ${fmtDate(inv.issueDate)}');
-      if (inv.eventDate.isNotEmpty) b.writeln('المناسبة: ${fmtDate(inv.eventDate)}${inv.location.isNotEmpty ? ' — ${inv.location}' : ''}');
-      b.writeln('إجمالي العرض: *${fmtSAR(t.total)}*${t.vatRateBp > 0 ? ' (شامل الضريبة)' : ''}');
-      if (inv.validUntil.isNotEmpty) b.writeln('العرض ساري حتى: ${fmtDate(inv.validUntil)}');
+      if (inv.eventDate.isNotEmpty) {
+        b.writeln(
+          'المناسبة: ${fmtDate(inv.eventDate)}${inv.location.isNotEmpty ? ' — ${inv.location}' : ''}',
+        );
+      }
+      b.writeln(
+        'إجمالي العرض: *${fmtSAR(t.total)}*${t.vatRateBp > 0 ? ' (شامل الضريبة)' : ''}',
+      );
+      if (inv.validUntil.isNotEmpty) {
+        b.writeln('العرض ساري حتى: ${fmtDate(inv.validUntil)}');
+      }
       b
         ..writeln()
         ..writeln('نتشرّف بخدمتكم، وبانتظار تأكيدكم.')
@@ -37,7 +44,11 @@ class ShareService {
         ..writeln()
         ..writeln('مرفق فاتورة رقم *${inv.number}* من *${org.name}*')
         ..writeln('التاريخ: ${fmtDate(inv.issueDate)}');
-      if (inv.eventDate.isNotEmpty) b.writeln('المناسبة: ${fmtDate(inv.eventDate)}${inv.location.isNotEmpty ? ' — ${inv.location}' : ''}');
+      if (inv.eventDate.isNotEmpty) {
+        b.writeln(
+          'المناسبة: ${fmtDate(inv.eventDate)}${inv.location.isNotEmpty ? ' — ${inv.location}' : ''}',
+        );
+      }
       b.writeln('الإجمالي: *${fmtSAR(t.total)}*');
       if (paid > 0) b.writeln('المدفوع: ${fmtSAR(paid)}');
       if (rem > 0) {
@@ -89,18 +100,22 @@ class ShareService {
   }
 
   static String receiptMessage(Payment p, Client c, Org org) => [
-        'السلام عليكم ورحمة الله وبركاته',
-        '${c.name} الكريم،',
-        '',
-        'نفيدكم باستلام مبلغ *${fmtSAR(p.amount)}* بتاريخ ${fmtDate(p.date)} (${p.method}).',
-        'مرفق سند القبض رقم *${p.receiptNumber}*.',
-        '',
-        'شكرًا لكم — ${org.name}',
-        '${org.phone} | ${org.website}',
-      ].join('\n');
+    'السلام عليكم ورحمة الله وبركاته',
+    '${c.name} الكريم،',
+    '',
+    'نفيدكم باستلام مبلغ *${fmtSAR(p.amount)}* بتاريخ ${fmtDate(p.date)} (${p.method}).',
+    'مرفق سند القبض رقم *${p.receiptNumber}*.',
+    '',
+    'شكرًا لكم — ${org.name}',
+    '${org.phone} | ${org.website}',
+  ].join('\n');
 
   /// مشاركة ملف PDF مع رسالة
-  static Future<void> sharePdf(Uint8List bytes, String fileName, String message) async {
+  static Future<void> sharePdf(
+    Uint8List bytes,
+    String fileName,
+    String message,
+  ) async {
     if (kIsWeb) {
       await Printing.sharePdf(bytes: bytes, filename: fileName);
       return;

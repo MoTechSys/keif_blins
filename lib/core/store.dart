@@ -5,48 +5,64 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:hive_flutter/hive_flutter.dart';
 
+import 'backup_service.dart';
+import 'brand.dart';
+import 'db.dart';
 import 'file_service.dart';
 import 'models.dart';
 
 class Store extends ChangeNotifier {
-  static const _boxName = 'keif_diafa';
-  late Box _box;
+  /// قاعدة البيانات: SQLite على أندرويد، Hive على الويب (انظر db.dart)
+  final AppDb _db;
+  Store({AppDb? db}) : _db = db ?? AppDb.create();
+
+  AppDb get database => _db;
+
+  /// إعدادات صغيرة (مفتاح/قيمة) — تُحمّل كلها عند التشغيل وتُكتب فورًا عند التغيير
+  final Map<String, dynamic> _kv = {};
 
   /// القوائم النشطة (كل الشاشات تعتمد عليها)
   final List<Client> clients = [];
   final List<Invoice> docs = []; // فواتير + عروض أسعار
   final List<Payment> payments = [];
+  final List<Claim> claims = [];
 
   /// سلة المحذوفات (ملاحظة 8): تُحذف نهائيًا تلقائيًا بعد [trashDays] يومًا
   static const trashDays = 30;
   final List<Client> trashClients = [];
   final List<Invoice> trashDocs = [];
   final List<Payment> trashPayments = [];
+  final List<Claim> trashClaims = [];
 
   Org org = Org();
   bool ready = false;
 
   /// رسالة خطأ التشغيل (إن فشل فتح قاعدة البيانات) — null يعني لا خطأ
   String? initError;
-  bool _hiveInited = false;
 
-  /// للاختبارات: تخطي Hive.initFlutter (يُستدعى Hive.init(path) مسبقًا)
-  @visibleForTesting
-  static bool skipHiveInit = false;
+  /// نتيجة فحص السلامة عند الفتح (null = سليمة)
+  String? integrityError;
+
+  /// عدد السجلات المرحّلة من Hive في هذا التشغيل (0 = لا ترحيل)
+  int migratedFromHive = 0;
+
+  bool _opened = false;
 
   Future<void> init() async {
     initError = null;
     try {
-      if (!_hiveInited && !skipHiveInit) {
-        await Hive.initFlutter();
+      if (!_opened) {
+        await _db.open(Brand.current.dbName);
+        _opened = true;
+        await _migrateFromHiveIfNeeded();
       }
-      _hiveInited = true;
-      _box = await Hive.openBox(_boxName);
-      _load();
+      integrityError = await _db.integrityCheck();
+      await _load();
       await purgeExpiredTrash();
       ready = true;
+      // نسخة اليوم عند الفتح (إن لم تُكتب بعد) — لا تنتظر الواجهة
+      unawaited(BackupService.dailyIfDue(this));
     } catch (e, st) {
       debugPrint('Store.init failed: $e\n$st');
       initError = '$e';
@@ -55,35 +71,89 @@ class Store extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _load() {
+  /// ترحيل لمرة واحدة من صندوق Hive (الإصدارات ≤ 2.2) إلى SQLite
+  /// لا يُحذف الصندوق القديم — يبقى نسخة أمان إضافية.
+  Future<void> _migrateFromHiveIfNeeded() async {
+    if (_db is! SqliteDb) return;
+    if (await _db.getKv('migratedFromHive') == true) return;
+    final legacy = await HiveDb.readLegacy(Brand.current.dbName);
+    if (legacy != null) {
+      List<Map<String, dynamic>> rows(String k) {
+        final v = legacy[k];
+        if (v is! List) return [];
+        return [
+          for (final m in v.whereType<Map>())
+            if (m['id'] is String) Map<String, dynamic>.from(m),
+        ];
+      }
+
+      final tables = {
+        for (final t in ['clients', 'docs', 'payments']) t: rows(t),
+      };
+      await _db.replaceTables(tables);
+      for (final k in legacy.keys) {
+        if (recordTables.contains(k)) continue;
+        await _db.putKv(k, legacy[k]);
+      }
+      // تحقق: كل سجل صالح وصل
+      var ok = true;
+      for (final e in tables.entries) {
+        if ((await _db.all(e.key)).length != e.value.length) ok = false;
+      }
+      if (!ok) {
+        throw StateError(
+          'فشل التحقق من ترحيل البيانات — لم يُعلَّم الترحيل كمكتمل، وستُعاد المحاولة',
+        );
+      }
+      migratedFromHive = tables.values.fold<int>(0, (s, l) => s + l.length);
+      debugPrint(
+        'Store: migrated $migratedFromHive records from Hive to SQLite',
+      );
+    }
+    await _db.putKv('migratedFromHive', true);
+  }
+
+  Future<void> _load() async {
     // سجل تالف واحد لا يجب أن يمنع تحميل الباقي
-    Iterable<T> safe<T>(String key, T Function(Map) parse) sync* {
-      for (final m in _list(key)) {
+    Future<List<T>> safe<T>(String table, T Function(Map) parse) async {
+      final out = <T>[];
+      for (final m in await _db.all(table)) {
         try {
-          yield parse(m);
+          out.add(parse(m));
         } catch (e) {
-          debugPrint('skip corrupt $key record: $e');
+          debugPrint('skip corrupt $table record: $e');
         }
       }
+      return out;
     }
 
-    // كل مفتاح يحمل النشط والمحذوف معًا؛ نفصلهما حسب deletedAt
+    // كل جدول يحمل النشط والمحذوف معًا؛ نفصلهما حسب deletedAt
     clients.clear();
     trashClients.clear();
-    for (final c in safe('clients', (m) => Client.fromMap(m))) {
+    for (final c in await safe('clients', (m) => Client.fromMap(m))) {
       (c.isDeleted ? trashClients : clients).add(c);
     }
     docs.clear();
     trashDocs.clear();
-    for (final d in safe('docs', (m) => Invoice.fromMap(m))) {
+    for (final d in await safe('docs', (m) => Invoice.fromMap(m))) {
       (d.isDeleted ? trashDocs : docs).add(d);
     }
     payments.clear();
     trashPayments.clear();
-    for (final p in safe('payments', (m) => Payment.fromMap(m))) {
+    for (final p in await safe('payments', (m) => Payment.fromMap(m))) {
       (p.isDeleted ? trashPayments : payments).add(p);
     }
-    final o = _box.get('org');
+    claims.clear();
+    trashClaims.clear();
+    for (final c in await safe('claims', (m) => Claim.fromMap(m))) {
+      (c.isDeleted ? trashClaims : claims).add(c);
+    }
+    _kv.clear();
+    for (final k in _kvKeys) {
+      final v = await _db.getKv(k);
+      if (v != null) _kv[k] = v;
+    }
+    final o = _kv['org'];
     try {
       org = Org.fromMap(o is Map ? o : null);
     } catch (_) {
@@ -91,65 +161,107 @@ class Store extends ChangeNotifier {
     }
   }
 
-  Iterable<Map> _list(String key) {
-    final v = _box.get(key);
-    if (v is List) return v.whereType<Map>();
-    return const [];
+  static const _kvKeys = [
+    'org',
+    'autoBackup',
+    'signedIn',
+    'accountName',
+    'accountEmail',
+    'accountPhoto',
+    'lastDailyBackup',
+    'lastDriveBackup',
+    'driveAuto',
+    'lastBackupHash',
+    'storageAsked',
+  ];
+
+  dynamic kv(String key) => _kv[key];
+  Future<void> setKv(String key, dynamic value) async {
+    _kv[key] = value;
+    await _db.putKv(key, value);
+    notifyListeners();
   }
 
-  Future<void> _save(String key) async {
-    switch (key) {
-      case 'clients':
-        await _box.put(key, [...clients, ...trashClients].map((e) => e.toMap()).toList());
-      case 'docs':
-        await _box.put(key, [...docs, ...trashDocs].map((e) => e.toMap()).toList());
-      case 'payments':
-        await _box.put(key, [...payments, ...trashPayments].map((e) => e.toMap()).toList());
-      case 'org':
-        await _box.put(key, org.toMap());
+  Map<String, List<Map<String, dynamic>>> _tableRows(String key) =>
+      switch (key) {
+        'clients' => {
+          'clients': [
+            ...clients,
+            ...trashClients,
+          ].map((e) => e.toMap()).toList(),
+        },
+        'docs' => {
+          'docs': [...docs, ...trashDocs].map((e) => e.toMap()).toList(),
+        },
+        'payments' => {
+          'payments': [
+            ...payments,
+            ...trashPayments,
+          ].map((e) => e.toMap()).toList(),
+        },
+        'claims' => {
+          'claims': [...claims, ...trashClaims].map((e) => e.toMap()).toList(),
+        },
+        _ => const {},
+      };
+
+  /// حفظ جدول أو أكثر في **معاملة واحدة** (الكل أو لا شيء)
+  Future<void> _saveAll(Iterable<String> keys) async {
+    final tables = <String, List<Map<String, dynamic>>>{};
+    for (final k in keys) {
+      if (k == 'org') {
+        _kv['org'] = org.toMap();
+        await _db.putKv('org', org.toMap());
+      } else {
+        tables.addAll(_tableRows(k));
+      }
     }
+    if (tables.isNotEmpty) await _db.replaceTables(tables);
     notifyListeners();
     _scheduleAutoBackup();
   }
 
+  Future<void> _save(String key) => _saveAll([key]);
+
   /* ---------- النسخ الاحتياطي التلقائي إلى مجلد الهاتف ---------- */
   Timer? _backupTimer;
 
-  /// آخر نسخة تلقائية ناجحة (مسار الملف) — للعرض في الإعدادات
+  /// آخر نسخة ناجحة (مسار الملف) — للعرض في الإعدادات
   String? lastAutoBackupPath;
   DateTime? lastAutoBackupAt;
 
-  bool get autoBackupEnabled => (_box.get('autoBackup') as bool?) ?? true;
+  bool get autoBackupEnabled => (_kv['autoBackup'] as bool?) ?? true;
   Future<void> setAutoBackup(bool v) async {
-    await _box.put('autoBackup', v);
-    notifyListeners();
+    await setKv('autoBackup', v);
     if (v) _scheduleAutoBackup();
   }
 
-  /// بعد أي تغيير: ننتظر 4 ثوانٍ (لتجميع التعديلات المتتالية) ثم نكتب نسخة اليوم
+  /// بعد أي تغيير: ننتظر 4 ثوانٍ (لتجميع التعديلات المتتالية) ثم نحدّث نسخة اليوم
   void _scheduleAutoBackup() {
     if (!FileService.supported || !autoBackupEnabled) return;
     _backupTimer?.cancel();
-    _backupTimer = Timer(const Duration(seconds: 4), () => backupNow(auto: true));
+    _backupTimer = Timer(
+      const Duration(seconds: 4),
+      () => backupNow(auto: true),
+    );
   }
 
-  /// كتابة نسخة احتياطية إلى مجلد الهاتف الآن. تعيد المسار أو null
+  /// كتابة نسخة احتياطية مُتحقَّق منها إلى مجلد الهاتف الآن. تعيد المسار أو null
   Future<String?> backupNow({bool auto = false}) async {
     if (!FileService.supported) return null;
     // لا نكتب نسخة لقاعدة فارغة تلقائيًا (قد تكون بعد مسح مقصود)
-    if (auto && clients.isEmpty && docs.isEmpty && payments.isEmpty) return null;
-    // ملاحظة 11ب: اسم النسخة اليدوية بالتاريخ والساعة والدقيقة  keif-backup-2026-05-09_14-35.json
-    // النسخة التلقائية: ملف واحد لليوم يُستبدل (auto-2026-05-09.json)
-    final name = auto ? 'auto-${todayISO()}.json' : 'keif-backup-${backupStamp()}.json';
-    final p = await FileService.saveBackup(exportJson(), name);
-    if (p != null) {
-      lastAutoBackupPath = p;
+    if (auto && isEmpty) return null;
+    final r = await BackupService.writeLocal(this, auto: auto);
+    if (r != null) {
+      lastAutoBackupPath = r;
       lastAutoBackupAt = DateTime.now();
-      if (auto) await FileService.pruneBackups(keep: 14);
       notifyListeners();
     }
-    return p;
+    return r;
   }
+
+  bool get isEmpty =>
+      clients.isEmpty && docs.isEmpty && payments.isEmpty && claims.isEmpty;
 
   /// 2026-05-09_14-35
   static String backupStamp([DateTime? t]) {
@@ -168,7 +280,8 @@ class Store extends ChangeNotifier {
   List<Invoice> get invoices =>
       docs.where((d) => d.kind == DocKind.invoice).toList()..sort(_byDateDesc);
   List<Invoice> get quotes =>
-      docs.where((d) => d.kind == DocKind.quotation).toList()..sort(_byDateDesc);
+      docs.where((d) => d.kind == DocKind.quotation).toList()
+        ..sort(_byDateDesc);
 
   int _byDateDesc(Invoice a, Invoice b) {
     final c = b.issueDate.compareTo(a.issueDate);
@@ -181,16 +294,19 @@ class Store extends ChangeNotifier {
   List<Invoice> clientInvoices(String clientId) =>
       invoices.where((i) => i.clientId == clientId).toList();
   List<Payment> clientPayments(String clientId) =>
-      payments.where((p) => p.clientId == clientId).toList()..sort((a, b) => b.date.compareTo(a.date));
+      payments.where((p) => p.clientId == clientId).toList()
+        ..sort((a, b) => b.date.compareTo(a.date));
   List<Invoice> clientQuotes(String clientId) =>
       quotes.where((q) => q.clientId == clientId).toList();
 
   /// اسم العميل الظاهر في المستند (عميل مسجّل أو عرض سريع)
-  String docClientName(Invoice d) => d.clientName.trim().isEmpty ? 'عميل' : d.clientName.trim();
+  String docClientName(Invoice d) =>
+      d.clientName.trim().isEmpty ? 'عميل' : d.clientName.trim();
 
   /// أسماء ملفات المشاركة/الحفظ الموحّدة (ملاحظة 11د)
   /// فاتورة INV-0005 - اسم العميل.pdf / عرض سعر QT-0001 - اسم العميل.pdf
-  String docFileName(Invoice d) => '${d.isQuote ? 'عرض سعر' : 'فاتورة'} ${d.number} - ${docClientName(d)}.pdf';
+  String docFileName(Invoice d) =>
+      '${d.isQuote ? 'عرض سعر' : 'فاتورة'} ${d.number} - ${docClientName(d)}.pdf';
 
   /// سند قبض REC-0001 - اسم العميل.pdf
   String receiptFileName(Payment p) {
@@ -203,12 +319,14 @@ class Store extends ChangeNotifier {
       '${detailed ? 'كشف حساب تفصيلي' : 'كشف حساب'} - ${c.name.trim()} - ${date ?? todayISO()}.pdf';
 
   /// إشعار تسليم - رقم الفاتورة - اسم العميل.pdf
-  String deliveryFileName(Invoice d) => 'إشعار تسليم - ${d.number} - ${docClientName(d)}.pdf';
+  String deliveryFileName(Invoice d) =>
+      'إشعار تسليم - ${d.number} - ${docClientName(d)}.pdf';
 
   ClientSummary summary(Client c) => clientSummary(c, docs, payments);
 
   /// مؤشرات الرئيسية
-  ({int outstanding, int billed, int collected, int thisMonth, int overdue}) get kpis {
+  ({int outstanding, int billed, int collected, int thisMonth, int overdue})
+  get kpis {
     var billed = 0, collected = 0, thisMonth = 0, overdue = 0, opening = 0;
     final ym = todayISO().substring(0, 7);
     for (final c in clients) {
@@ -222,9 +340,14 @@ class Store extends ChangeNotifier {
       if (i.issueDate.startsWith(ym)) thisMonth += t;
       if (computeStatus(i, payments) != InvoiceStatus.paid) overdue++;
     }
-    final liveIds = docs.where((d) => d.countsInLedger).map((d) => d.id).toSet();
+    final liveIds = docs
+        .where((d) => d.countsInLedger)
+        .map((d) => d.id)
+        .toSet();
     for (final p in payments) {
-      if (p.invoiceId.isEmpty || liveIds.contains(p.invoiceId)) collected += p.amount;
+      if (p.invoiceId.isEmpty || liveIds.contains(p.invoiceId)) {
+        collected += p.amount;
+      }
     }
     return (
       outstanding: opening + billed - collected,
@@ -245,7 +368,8 @@ class Store extends ChangeNotifier {
     String two(int v) => v.toString().padLeft(2, '0');
     if (org.numberingMode == 'datetime') {
       // INV-20260509-143522 — فريد بطبيعته؛ نضيف لاحقة إن تكرّر في نفس الثانية
-      final base = '$prefix${now.year}${two(now.month)}${two(now.day)}-${two(now.hour)}${two(now.minute)}${two(now.second)}';
+      final base =
+          '$prefix${now.year}${two(now.month)}${two(now.day)}-${two(now.hour)}${two(now.minute)}${two(now.second)}';
       var n = base;
       var k = 1;
       while (_allDocs.any((d) => d.number == n)) {
@@ -257,7 +381,9 @@ class Store extends ChangeNotifier {
     final yearPart = org.numberYear ? '${now.year}-' : '';
     var max = org.invStart - 1;
     for (final d in _allDocs.where((d) => d.kind == kind)) {
-      if (org.numberYear && !d.number.startsWith('$prefix$yearPart')) continue; // التسلسل يبدأ من جديد كل سنة
+      if (org.numberYear && !d.number.startsWith('$prefix$yearPart')) {
+        continue; // التسلسل يبدأ من جديد كل سنة
+      }
       final m = RegExp(r'(\d+)\s*$').firstMatch(d.number);
       final n = m == null ? null : int.tryParse(m[1]!);
       if (n != null && n > max) max = n;
@@ -307,11 +433,11 @@ class Store extends ChangeNotifier {
       for (final d in docs.where((d) => d.clientId == c.id)) {
         d.clientName = c.name;
       }
-      await _save('docs');
+      await _saveAll(['docs', 'clients']);
     } else {
       clients.add(c);
+      await _save('clients');
     }
-    await _save('clients');
   }
 
   /// حذف عميل = نقله مع مستنداته ودفعاته إلى سلة المحذوفات (يمكن استرجاعه 30 يومًا)
@@ -329,9 +455,11 @@ class Store extends ChangeNotifier {
       payments.remove(p);
       trashPayments.add(p..deletedAt = stamp);
     }
-    await _save('docs');
-    await _save('payments');
-    await _save('clients');
+    for (final cl in claims.where((x) => x.clientId == id).toList()) {
+      claims.remove(cl);
+      trashClaims.add(cl..deletedAt = stamp);
+    }
+    await _saveAll(['docs', 'payments', 'claims', 'clients']);
   }
 
   /* ---------- المستندات ---------- */
@@ -360,8 +488,7 @@ class Store extends ChangeNotifier {
       payments.remove(p);
       trashPayments.add(p..deletedAt = stamp);
     }
-    await _save('payments');
-    await _save('docs');
+    await _saveAll(['payments', 'docs']);
   }
 
   /// تحويل عرض سعر إلى فاتورة. [clientId] يُمرَّر عند تحويل عرض سريع بعد إنشاء عميل له
@@ -396,12 +523,13 @@ class Store extends ChangeNotifier {
     } else {
       payments.add(p);
     }
-    await _save('payments');
-    // تحديث حالة الفاتورة المرتبطة
+    // الدفعة وحالة الفاتورة المرتبطة في معاملة واحدة
     final inv = doc(p.invoiceId);
     if (inv != null && inv.countsInLedger) {
       inv.status = computeStatus(inv, payments).name;
-      await _save('docs');
+      await _saveAll(['payments', 'docs']);
+    } else {
+      await _save('payments');
     }
   }
 
@@ -423,8 +551,123 @@ class Store extends ChangeNotifier {
     }
   }
 
+  /* ---------- خطابات المطالبة المالية ---------- */
+  List<Claim> get claimsSorted => [...claims]
+    ..sort((a, b) {
+      final c = b.date.compareTo(a.date);
+      return c != 0 ? c : b.createdAt.compareTo(a.createdAt);
+    });
+
+  Claim? claim(String id) => claims.where((c) => c.id == id).firstOrNull;
+  List<Claim> clientClaims(String clientId) =>
+      claimsSorted.where((c) => c.clientId == clientId).toList();
+
+  /// الترقيم يتبع نمط الإعدادات (تسلسلي / تاريخ ووقت) ببادئة المطالبة
+  String nextClaimNumber() {
+    final prefix = org.claimPrefix.isEmpty ? 'CLM-' : org.claimPrefix;
+    final all = [...claims, ...trashClaims];
+    final now = DateTime.now();
+    String two(int v) => v.toString().padLeft(2, '0');
+    if (org.numberingMode == 'datetime') {
+      final base =
+          '$prefix${now.year}${two(now.month)}${two(now.day)}-${two(now.hour)}${two(now.minute)}${two(now.second)}';
+      var n = base;
+      var k = 1;
+      while (all.any((c) => c.number == n)) {
+        n = '$base-${k++}';
+      }
+      return n;
+    }
+    var max = 0;
+    for (final c in all) {
+      if (!c.number.startsWith(prefix)) continue;
+      final m = RegExp(r'(\d+)\s*$').firstMatch(c.number);
+      final n = m == null ? null : int.tryParse(m[1]!);
+      if (n != null && n > max) max = n;
+    }
+    return '$prefix${(max + 1).toString().padLeft(4, '0')}';
+  }
+
+  Future<void> saveClaim(Claim c) async {
+    c.updatedAt = DateTime.now().toIso8601String();
+    if (c.number.isEmpty) c.number = nextClaimNumber();
+    final i = claims.indexWhere((x) => x.id == c.id);
+    if (i >= 0) {
+      claims[i] = c;
+    } else {
+      claims.add(c);
+    }
+    await _save('claims');
+  }
+
+  Future<void> deleteClaim(String id) async {
+    final c = claims.where((x) => x.id == id).firstOrNull;
+    if (c == null) return;
+    claims.remove(c);
+    trashClaims.add(c..deletedAt = DateTime.now().toIso8601String());
+    await _save('claims');
+  }
+
+  Future<void> restoreClaim(String id) async {
+    final c = trashClaims.where((x) => x.id == id).firstOrNull;
+    if (c == null) return;
+    trashClaims.remove(c);
+    claims.add(c..deletedAt = '');
+    await _save('claims');
+  }
+
+  Future<void> purgeClaim(String id) async {
+    trashClaims.removeWhere((c) => c.id == id);
+    await _save('claims');
+  }
+
+  /// مسودة مطالبة من فواتير العميل: بند لكل فاتورة بمتبقيها (أو إجماليها)
+  Claim claimFromInvoices(
+    Client c,
+    List<Invoice> invs, {
+    bool remainingOnly = true,
+  }) {
+    final items = <ClaimItem>[];
+    for (final i in invs) {
+      final amt = remainingOnly
+          ? invoiceRemaining(i, payments)
+          : i.totals.total;
+      if (amt <= 0) continue;
+      final first = i.items.isEmpty
+          ? ''
+          : i.items.first.desc.split('\n').first.trim();
+      final what = [
+        if (first.isNotEmpty) first else 'خدمات ضيافة',
+        if (i.eventDate.isNotEmpty) 'بتاريخ ${fmtDate(i.eventDate)}',
+        if (i.location.isNotEmpty) '— ${i.location}',
+      ].join(' ');
+      items.add(
+        ClaimItem(
+          desc: what,
+          amount: amt,
+          invoiceId: i.id,
+          invoiceNumber: i.number,
+        ),
+      );
+    }
+    return Claim(
+      clientId: c.id,
+      recipient: c.name,
+      items: items,
+      showRefColumn: true,
+    );
+  }
+
+  /// سطر اسم الملف: خطاب مطالبة CLM-0001 - الجهة.pdf
+  String claimFileName(Claim c) =>
+      'خطاب مطالبة ${c.number} - ${c.recipient.trim().isEmpty ? 'جهة' : c.recipient.trim()}.pdf';
+
   /* ---------- سلة المحذوفات (ملاحظة 8) ---------- */
-  int get trashCount => trashClients.length + trashDocs.length + trashPayments.length;
+  int get trashCount =>
+      trashClients.length +
+      trashDocs.length +
+      trashPayments.length +
+      trashClaims.length;
 
   /// الأيام المتبقية قبل الحذف النهائي
   static int daysLeft(String deletedAt) {
@@ -441,17 +684,28 @@ class Store extends ChangeNotifier {
     trashClients.remove(c);
     clients.add(c..deletedAt = '');
     // نسترجع ما حُذف معه في نفس العملية
-    for (final d in trashDocs.where((d) => d.clientId == id && d.deletedAt == stamp).toList()) {
+    for (final d
+        in trashDocs
+            .where((d) => d.clientId == id && d.deletedAt == stamp)
+            .toList()) {
       trashDocs.remove(d);
       docs.add(d..deletedAt = '');
     }
-    for (final p in trashPayments.where((p) => p.clientId == id && p.deletedAt == stamp).toList()) {
+    for (final p
+        in trashPayments
+            .where((p) => p.clientId == id && p.deletedAt == stamp)
+            .toList()) {
       trashPayments.remove(p);
       payments.add(p..deletedAt = '');
     }
-    await _save('clients');
-    await _save('docs');
-    await _save('payments');
+    for (final cl
+        in trashClaims
+            .where((x) => x.clientId == id && x.deletedAt == stamp)
+            .toList()) {
+      trashClaims.remove(cl);
+      claims.add(cl..deletedAt = '');
+    }
+    await _saveAll(['clients', 'docs', 'payments', 'claims']);
   }
 
   Future<void> restoreDoc(String id) async {
@@ -466,13 +720,14 @@ class Store extends ChangeNotifier {
       trashClients.remove(tc);
       clients.add(tc..deletedAt = '');
     }
-    for (final p in trashPayments.where((p) => p.invoiceId == id && p.deletedAt == stamp).toList()) {
+    for (final p
+        in trashPayments
+            .where((p) => p.invoiceId == id && p.deletedAt == stamp)
+            .toList()) {
       trashPayments.remove(p);
       payments.add(p..deletedAt = '');
     }
-    await _save('clients');
-    await _save('payments');
-    await _save('docs');
+    await _saveAll(['clients', 'payments', 'docs']);
     await _refreshInvoiceStatus(d.id);
   }
 
@@ -490,16 +745,14 @@ class Store extends ChangeNotifier {
     trashClients.removeWhere((c) => c.id == id);
     trashDocs.removeWhere((d) => d.clientId == id);
     trashPayments.removeWhere((p) => p.clientId == id);
-    await _save('clients');
-    await _save('docs');
-    await _save('payments');
+    trashClaims.removeWhere((x) => x.clientId == id);
+    await _saveAll(['clients', 'docs', 'payments', 'claims']);
   }
 
   Future<void> purgeDoc(String id) async {
     trashDocs.removeWhere((d) => d.id == id);
     trashPayments.removeWhere((p) => p.invoiceId == id);
-    await _save('docs');
-    await _save('payments');
+    await _saveAll(['docs', 'payments']);
   }
 
   Future<void> purgePayment(String id) async {
@@ -512,9 +765,8 @@ class Store extends ChangeNotifier {
     trashClients.clear();
     trashDocs.clear();
     trashPayments.clear();
-    await _save('clients');
-    await _save('docs');
-    await _save('payments');
+    trashClaims.clear();
+    await _saveAll(['clients', 'docs', 'payments', 'claims']);
   }
 
   /// الحذف التلقائي لما تجاوز 30 يومًا (يُستدعى عند التشغيل)
@@ -523,14 +775,17 @@ class Store extends ChangeNotifier {
       final t = DateTime.tryParse(at);
       return t == null || DateTime.now().difference(t).inDays >= trashDays;
     }
+
     final before = trashCount;
     trashClients.removeWhere((c) => expired(c.deletedAt));
     trashDocs.removeWhere((d) => expired(d.deletedAt));
     trashPayments.removeWhere((p) => expired(p.deletedAt));
+    trashClaims.removeWhere((x) => expired(x.deletedAt));
     if (trashCount != before) {
-      await _box.put('clients', [...clients, ...trashClients].map((e) => e.toMap()).toList());
-      await _box.put('docs', [...docs, ...trashDocs].map((e) => e.toMap()).toList());
-      await _box.put('payments', [...payments, ...trashPayments].map((e) => e.toMap()).toList());
+      await _db.replaceTables({
+        for (final k in ['clients', 'docs', 'payments', 'claims'])
+          ..._tableRows(k),
+      });
     }
   }
 
@@ -542,22 +797,39 @@ class Store extends ChangeNotifier {
 
   /* ---------- الحساب / شاشة الدخول ---------- */
   /// هل اختار المستخدم طريقة الدخول (Google أو بدون تسجيل)؟
-  bool get signedIn => ready && ((_box.get('signedIn') as bool?) ?? false);
-  String get accountName => ready ? (_box.get('accountName') as String?) ?? '' : '';
-  String get accountEmail => ready ? (_box.get('accountEmail') as String?) ?? '' : '';
-  String get accountPhoto => ready ? (_box.get('accountPhoto') as String?) ?? '' : '';
-  Future<void> setAccount({String name = '', String email = '', String photo = ''}) async {
-    await _box.put('signedIn', true);
-    await _box.put('accountName', name);
-    await _box.put('accountEmail', email);
-    await _box.put('accountPhoto', photo);
+  bool get signedIn => ready && ((_kv['signedIn'] as bool?) ?? false);
+  String get accountName => ready ? (_kv['accountName'] as String?) ?? '' : '';
+  String get accountEmail =>
+      ready ? (_kv['accountEmail'] as String?) ?? '' : '';
+  String get accountPhoto =>
+      ready ? (_kv['accountPhoto'] as String?) ?? '' : '';
+  Future<void> setAccount({
+    String name = '',
+    String email = '',
+    String photo = '',
+  }) async {
+    for (final e in {
+      'signedIn': true,
+      'accountName': name,
+      'accountEmail': email,
+      'accountPhoto': photo,
+    }.entries) {
+      _kv[e.key] = e.value;
+      await _db.putKv(e.key, e.value);
+    }
     notifyListeners();
   }
+
   Future<void> signOut() async {
-    await _box.put('signedIn', false);
-    await _box.put('accountName', '');
-    await _box.put('accountEmail', '');
-    await _box.put('accountPhoto', '');
+    for (final e in {
+      'signedIn': false,
+      'accountName': '',
+      'accountEmail': '',
+      'accountPhoto': '',
+    }.entries) {
+      _kv[e.key] = e.value;
+      await _db.putKv(e.key, e.value);
+    }
     notifyListeners();
   }
 
@@ -568,28 +840,40 @@ class Store extends ChangeNotifier {
   }
 
   /* ---------- النسخ الاحتياطي ---------- */
-  String exportJson() => jsonEncode({
-        'app': 'keif-diafa',
-        'schema': 3,
-        'exportedAt': DateTime.now().toIso8601String(),
-        'counts': {'clients': clients.length, 'docs': docs.length, 'payments': payments.length},
-        'data': {
-          'clients': [...clients, ...trashClients].map((e) => e.toMap()).toList(),
-          'docs': [...docs, ...trashDocs].map((e) => e.toMap()).toList(),
-          'payments': [...payments, ...trashPayments].map((e) => e.toMap()).toList(),
-          'org': org.toMap(),
-        },
-      });
+  /// بيانات النسخة (بلا غلاف التحقق) — BackupService يضيف البصمة والتحقق
+  Map<String, dynamic> exportData() => {
+    'clients': [...clients, ...trashClients].map((e) => e.toMap()).toList(),
+    'docs': [...docs, ...trashDocs].map((e) => e.toMap()).toList(),
+    'payments': [...payments, ...trashPayments].map((e) => e.toMap()).toList(),
+    'claims': [...claims, ...trashClaims].map((e) => e.toMap()).toList(),
+    'org': org.toMap(),
+  };
+
+  Map<String, int> get counts => {
+    'clients': clients.length,
+    'docs': docs.length,
+    'payments': payments.length,
+    'claims': claims.length,
+  };
+
+  String exportJson() => BackupService.encode(this);
 
   /// يستورد نسخة (يدعم نسخ التطبيق القديم: invoices بدل docs)
   Future<int> importJson(String json) async {
     final m = jsonDecode(json);
-    if (m is! Map || m['data'] is! Map) throw const FormatException('ملف غير صالح');
+    if (m is! Map || m['data'] is! Map) {
+      throw const FormatException('ملف غير صالح');
+    }
     final data = m['data'] as Map;
     var n = 0;
     // سجل تالف واحد لا يُفشل الاسترجاع كله — نتجاوزه ونكمل
     Iterable<Map> maps(dynamic v) => v is List ? v.whereType<Map>() : const [];
-    void upsert<T>(List<T> list, Iterable<Map> raw, T Function(Map) parse, String Function(T) id) {
+    void upsert<T>(
+      List<T> list,
+      Iterable<Map> raw,
+      T Function(Map) parse,
+      String Function(T) id,
+    ) {
       for (final r in raw) {
         try {
           final item = parse(r);
@@ -613,15 +897,30 @@ class Store extends ChangeNotifier {
     trashClients.clear();
     trashDocs.clear();
     trashPayments.clear();
+    claims.addAll(trashClaims);
+    trashClaims.clear();
     upsert<Client>(clients, maps(data['clients']), Client.fromMap, (c) => c.id);
-    upsert<Invoice>(docs, [...maps(data['docs']), ...maps(data['invoices'])], Invoice.fromMap, (d) => d.id);
-    upsert<Payment>(payments, maps(data['payments']), Payment.fromMap, (p) => p.id);
+    upsert<Invoice>(
+      docs,
+      [...maps(data['docs']), ...maps(data['invoices'])],
+      Invoice.fromMap,
+      (d) => d.id,
+    );
+    upsert<Payment>(
+      payments,
+      maps(data['payments']),
+      Payment.fromMap,
+      (p) => p.id,
+    );
+    upsert<Claim>(claims, maps(data['claims']), Claim.fromMap, (c) => c.id);
     trashClients.addAll(clients.where((c) => c.isDeleted));
     clients.removeWhere((c) => c.isDeleted);
     trashDocs.addAll(docs.where((d) => d.isDeleted));
     docs.removeWhere((d) => d.isDeleted);
     trashPayments.addAll(payments.where((p) => p.isDeleted));
     payments.removeWhere((p) => p.isDeleted);
+    trashClaims.addAll(claims.where((c) => c.isDeleted));
+    claims.removeWhere((c) => c.isDeleted);
     if (data['org'] is Map) {
       try {
         org = Org.fromMap({...org.toMap(), ...(data['org'] as Map)});
@@ -629,10 +928,7 @@ class Store extends ChangeNotifier {
         debugPrint('import: org skipped: $e');
       }
     }
-    await _save('clients');
-    await _save('docs');
-    await _save('payments');
-    await _save('org');
+    await _saveAll(['clients', 'docs', 'payments', 'claims', 'org']);
     return n;
   }
 
@@ -646,8 +942,11 @@ class Store extends ChangeNotifier {
     trashClients.clear();
     trashDocs.clear();
     trashPayments.clear();
+    claims.clear();
+    trashClaims.clear();
     org = Org();
-    await _box.clear();
+    _kv.clear();
+    await _db.clearAll();
     notifyListeners();
   }
 }

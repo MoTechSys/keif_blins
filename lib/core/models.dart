@@ -1,6 +1,7 @@
 /// models.dart — نماذج البيانات والمحاسبة | كيف الضيافة
 library;
 
+import 'brand.dart';
 import 'money.dart';
 
 String uid(String prefix) {
@@ -15,8 +16,18 @@ String todayISO() {
 }
 
 const arMonths = [
-  'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-  'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر',
+  'يناير',
+  'فبراير',
+  'مارس',
+  'أبريل',
+  'مايو',
+  'يونيو',
+  'يوليو',
+  'أغسطس',
+  'سبتمبر',
+  'أكتوبر',
+  'نوفمبر',
+  'ديسمبر',
 ];
 
 /// ISO → "2026/8/4"
@@ -69,34 +80,43 @@ class Client {
     this.deletedAt = '',
     String? createdAt,
     String? updatedAt,
-  })  : id = id ?? uid('c_'),
-        createdAt = createdAt ?? DateTime.now().toIso8601String(),
-        updatedAt = updatedAt ?? DateTime.now().toIso8601String();
+  }) : id = id ?? uid('c_'),
+       createdAt = createdAt ?? DateTime.now().toIso8601String(),
+       updatedAt = updatedAt ?? DateTime.now().toIso8601String();
 
   Map<String, dynamic> toMap() => {
-        'id': id, 'name': name, 'contact': contact, 'phone': phone,
-        'email': email, 'vatNumber': vatNumber, 'crNumber': crNumber,
-        'address': address, 'notes': notes, 'openingBalance': openingBalance,
-        'deletedAt': deletedAt, 'createdAt': createdAt, 'updatedAt': updatedAt,
-      };
+    'id': id,
+    'name': name,
+    'contact': contact,
+    'phone': phone,
+    'email': email,
+    'vatNumber': vatNumber,
+    'crNumber': crNumber,
+    'address': address,
+    'notes': notes,
+    'openingBalance': openingBalance,
+    'deletedAt': deletedAt,
+    'createdAt': createdAt,
+    'updatedAt': updatedAt,
+  };
 
   bool get isDeleted => deletedAt.isNotEmpty;
 
   factory Client.fromMap(Map m) => Client(
-        id: m['id'] as String?,
-        name: (m['name'] ?? '') as String,
-        contact: (m['contact'] ?? '') as String,
-        phone: (m['phone'] ?? '') as String,
-        email: (m['email'] ?? '') as String,
-        vatNumber: (m['vatNumber'] ?? '') as String,
-        crNumber: (m['crNumber'] ?? '') as String,
-        address: (m['address'] ?? '') as String,
-        notes: (m['notes'] ?? '') as String,
-        openingBalance: (m['openingBalance'] as num?)?.toInt() ?? 0,
-        deletedAt: (m['deletedAt'] ?? '') as String,
-        createdAt: m['createdAt'] as String?,
-        updatedAt: m['updatedAt'] as String?,
-      );
+    id: m['id'] as String?,
+    name: (m['name'] ?? '') as String,
+    contact: (m['contact'] ?? '') as String,
+    phone: (m['phone'] ?? '') as String,
+    email: (m['email'] ?? '') as String,
+    vatNumber: (m['vatNumber'] ?? '') as String,
+    crNumber: (m['crNumber'] ?? '') as String,
+    address: (m['address'] ?? '') as String,
+    notes: (m['notes'] ?? '') as String,
+    openingBalance: (m['openingBalance'] as num?)?.toInt() ?? 0,
+    deletedAt: (m['deletedAt'] ?? '') as String,
+    createdAt: m['createdAt'] as String?,
+    updatedAt: m['updatedAt'] as String?,
+  );
 }
 
 /* ============================================================
@@ -125,18 +145,22 @@ class LineItem {
   int get total => service + external;
 
   Map<String, dynamic> toMap() => {
-        'id': id, 'desc': desc, 'unitPrice': unitPrice, 'qty': qty,
-        'unitLabel': unitLabel, 'external': external,
-      };
+    'id': id,
+    'desc': desc,
+    'unitPrice': unitPrice,
+    'qty': qty,
+    'unitLabel': unitLabel,
+    'external': external,
+  };
 
   factory LineItem.fromMap(Map m) => LineItem(
-        id: m['id'] as String?,
-        desc: (m['desc'] ?? '') as String,
-        unitPrice: (m['unitPrice'] as num?)?.toInt() ?? 0,
-        qty: (m['qty'] as num?)?.toDouble() ?? 1,
-        unitLabel: (m['unitLabel'] ?? 'فترة') as String,
-        external: (m['external'] as num?)?.toInt() ?? 0,
-      );
+    id: m['id'] as String?,
+    desc: (m['desc'] ?? '') as String,
+    unitPrice: (m['unitPrice'] as num?)?.toInt() ?? 0,
+    qty: (m['qty'] as num?)?.toDouble() ?? 1,
+    unitLabel: (m['unitLabel'] ?? 'فترة') as String,
+    external: (m['external'] as num?)?.toInt() ?? 0,
+  );
 
   LineItem copy() => LineItem.fromMap(toMap());
 }
@@ -201,6 +225,7 @@ class Invoice {
   String convertedTo; // رقم الفاتورة الناتجة عن عرض السعر
   /// جوال العميل في "العرض السريع" (عرض سعر بلا عميل مسجّل: clientId فارغ)
   String quickPhone;
+
   /// تاريخ النقل إلى سلة المحذوفات (فارغ = نشط)
   String deletedAt;
   String createdAt;
@@ -220,7 +245,8 @@ class Invoice {
     this.attendees = '',
     List<LineItem>? items,
     this.discount = 0,
-    this.vatRateBp = 0, // بدون ضريبة افتراضيًا؛ النموذج يضبطها من إعدادات المؤسسة عند التفعيل
+    this.vatRateBp =
+        0, // بدون ضريبة افتراضيًا؛ النموذج يضبطها من إعدادات المؤسسة عند التفعيل
     this.deposit = 0,
     String? status,
     this.notes = '',
@@ -230,12 +256,12 @@ class Invoice {
     this.deletedAt = '',
     String? createdAt,
     String? updatedAt,
-  })  : id = id ?? uid('i_'),
-        issueDate = issueDate ?? todayISO(),
-        items = items ?? [],
-        status = status ?? 'draft',
-        createdAt = createdAt ?? DateTime.now().toIso8601String(),
-        updatedAt = updatedAt ?? DateTime.now().toIso8601String();
+  }) : id = id ?? uid('i_'),
+       issueDate = issueDate ?? todayISO(),
+       items = items ?? [],
+       status = status ?? 'draft',
+       createdAt = createdAt ?? DateTime.now().toIso8601String(),
+       updatedAt = updatedAt ?? DateTime.now().toIso8601String();
 
   bool get isQuote => kind == DocKind.quotation;
 
@@ -253,7 +279,9 @@ class Invoice {
     // ملاحظة: لا نستخدم clamp(0, 1 << 62) لأن الإزاحة > 31 بت على الويب (dart2js) تعطي 0
     // فيصبح الإجمالي 0.00 دائمًا. الخصم لا يتجاوز المجموع الفرعي أبدًا.
     final afterDiscount = subtotal - discount < 0 ? 0 : subtotal - discount;
-    final vat = vatRateBp > 0 ? roundHalfUp(afterDiscount * vatRateBp / 10000) : 0;
+    final vat = vatRateBp > 0
+        ? roundHalfUp(afterDiscount * vatRateBp / 10000)
+        : 0;
     return Totals(
       services: services,
       external: external,
@@ -265,50 +293,73 @@ class Invoice {
     );
   }
 
-  InvoiceStatus get invoiceStatus =>
-      InvoiceStatus.values.firstWhere((s) => s.name == status, orElse: () => InvoiceStatus.issued);
-  QuoteStatus get quoteStatus =>
-      QuoteStatus.values.firstWhere((s) => s.name == status, orElse: () => QuoteStatus.draft);
+  InvoiceStatus get invoiceStatus => InvoiceStatus.values.firstWhere(
+    (s) => s.name == status,
+    orElse: () => InvoiceStatus.issued,
+  );
+  QuoteStatus get quoteStatus => QuoteStatus.values.firstWhere(
+    (s) => s.name == status,
+    orElse: () => QuoteStatus.draft,
+  );
 
   bool get countsInLedger =>
-      !isQuote && invoiceStatus != InvoiceStatus.draft && invoiceStatus != InvoiceStatus.cancelled;
+      !isQuote &&
+      invoiceStatus != InvoiceStatus.draft &&
+      invoiceStatus != InvoiceStatus.cancelled;
 
   Map<String, dynamic> toMap() => {
-        'id': id, 'kind': kind.name, 'number': number, 'clientId': clientId,
-        'clientName': clientName, 'issueDate': issueDate, 'eventDate': eventDate,
-        'eventDateTo': eventDateTo, 'validUntil': validUntil, 'location': location,
-        'attendees': attendees, 'items': items.map((e) => e.toMap()).toList(),
-        'discount': discount, 'vatRateBp': vatRateBp, 'deposit': deposit,
-        'status': status, 'notes': notes, 'terms': terms, 'convertedTo': convertedTo,
-        'quickPhone': quickPhone, 'deletedAt': deletedAt,
-        'createdAt': createdAt, 'updatedAt': updatedAt,
-      };
+    'id': id,
+    'kind': kind.name,
+    'number': number,
+    'clientId': clientId,
+    'clientName': clientName,
+    'issueDate': issueDate,
+    'eventDate': eventDate,
+    'eventDateTo': eventDateTo,
+    'validUntil': validUntil,
+    'location': location,
+    'attendees': attendees,
+    'items': items.map((e) => e.toMap()).toList(),
+    'discount': discount,
+    'vatRateBp': vatRateBp,
+    'deposit': deposit,
+    'status': status,
+    'notes': notes,
+    'terms': terms,
+    'convertedTo': convertedTo,
+    'quickPhone': quickPhone,
+    'deletedAt': deletedAt,
+    'createdAt': createdAt,
+    'updatedAt': updatedAt,
+  };
 
   factory Invoice.fromMap(Map m) => Invoice(
-        id: m['id'] as String?,
-        kind: (m['kind'] == 'quotation') ? DocKind.quotation : DocKind.invoice,
-        number: (m['number'] ?? '') as String,
-        clientId: (m['clientId'] ?? '') as String,
-        clientName: (m['clientName'] ?? '') as String,
-        issueDate: (m['issueDate'] ?? todayISO()) as String,
-        eventDate: (m['eventDate'] ?? '') as String,
-        eventDateTo: (m['eventDateTo'] ?? '') as String,
-        validUntil: (m['validUntil'] ?? '') as String,
-        location: (m['location'] ?? '') as String,
-        attendees: (m['attendees'] ?? '').toString(),
-        items: ((m['items'] as List?) ?? []).map((e) => LineItem.fromMap(e as Map)).toList(),
-        discount: (m['discount'] as num?)?.toInt() ?? 0,
-        vatRateBp: (m['vatRateBp'] as num?)?.toInt() ?? 0,
-        deposit: (m['deposit'] as num?)?.toInt() ?? 0,
-        status: (m['status'] ?? 'draft') as String,
-        notes: (m['notes'] ?? '') as String,
-        terms: (m['terms'] ?? '') as String,
-        convertedTo: (m['convertedTo'] ?? '') as String,
-        quickPhone: (m['quickPhone'] ?? '') as String,
-        deletedAt: (m['deletedAt'] ?? '') as String,
-        createdAt: m['createdAt'] as String?,
-        updatedAt: m['updatedAt'] as String?,
-      );
+    id: m['id'] as String?,
+    kind: (m['kind'] == 'quotation') ? DocKind.quotation : DocKind.invoice,
+    number: (m['number'] ?? '') as String,
+    clientId: (m['clientId'] ?? '') as String,
+    clientName: (m['clientName'] ?? '') as String,
+    issueDate: (m['issueDate'] ?? todayISO()) as String,
+    eventDate: (m['eventDate'] ?? '') as String,
+    eventDateTo: (m['eventDateTo'] ?? '') as String,
+    validUntil: (m['validUntil'] ?? '') as String,
+    location: (m['location'] ?? '') as String,
+    attendees: (m['attendees'] ?? '').toString(),
+    items: ((m['items'] as List?) ?? [])
+        .map((e) => LineItem.fromMap(e as Map))
+        .toList(),
+    discount: (m['discount'] as num?)?.toInt() ?? 0,
+    vatRateBp: (m['vatRateBp'] as num?)?.toInt() ?? 0,
+    deposit: (m['deposit'] as num?)?.toInt() ?? 0,
+    status: (m['status'] ?? 'draft') as String,
+    notes: (m['notes'] ?? '') as String,
+    terms: (m['terms'] ?? '') as String,
+    convertedTo: (m['convertedTo'] ?? '') as String,
+    quickPhone: (m['quickPhone'] ?? '') as String,
+    deletedAt: (m['deletedAt'] ?? '') as String,
+    createdAt: m['createdAt'] as String?,
+    updatedAt: m['updatedAt'] as String?,
+  );
 
   Invoice copy() => Invoice.fromMap(toMap());
 }
@@ -343,31 +394,39 @@ class Payment {
     this.receiptNumber = '',
     this.deletedAt = '',
     String? createdAt,
-  })  : id = id ?? uid('p_'),
-        date = date ?? todayISO(),
-        createdAt = createdAt ?? DateTime.now().toIso8601String();
+  }) : id = id ?? uid('p_'),
+       date = date ?? todayISO(),
+       createdAt = createdAt ?? DateTime.now().toIso8601String();
 
   Map<String, dynamic> toMap() => {
-        'id': id, 'clientId': clientId, 'invoiceId': invoiceId, 'amount': amount,
-        'date': date, 'method': method, 'reference': reference, 'notes': notes,
-        'receiptNumber': receiptNumber, 'deletedAt': deletedAt, 'createdAt': createdAt,
-      };
+    'id': id,
+    'clientId': clientId,
+    'invoiceId': invoiceId,
+    'amount': amount,
+    'date': date,
+    'method': method,
+    'reference': reference,
+    'notes': notes,
+    'receiptNumber': receiptNumber,
+    'deletedAt': deletedAt,
+    'createdAt': createdAt,
+  };
 
   bool get isDeleted => deletedAt.isNotEmpty;
 
   factory Payment.fromMap(Map m) => Payment(
-        id: m['id'] as String?,
-        clientId: (m['clientId'] ?? '') as String,
-        invoiceId: (m['invoiceId'] ?? '') as String,
-        amount: (m['amount'] as num?)?.toInt() ?? 0,
-        date: (m['date'] ?? todayISO()) as String,
-        method: (m['method'] ?? 'تحويل بنكي') as String,
-        reference: (m['reference'] ?? '') as String,
-        notes: (m['notes'] ?? '') as String,
-        receiptNumber: (m['receiptNumber'] ?? '') as String,
-        deletedAt: (m['deletedAt'] ?? '') as String,
-        createdAt: m['createdAt'] as String?,
-      );
+    id: m['id'] as String?,
+    clientId: (m['clientId'] ?? '') as String,
+    invoiceId: (m['invoiceId'] ?? '') as String,
+    amount: (m['amount'] as num?)?.toInt() ?? 0,
+    date: (m['date'] ?? todayISO()) as String,
+    method: (m['method'] ?? 'تحويل بنكي') as String,
+    reference: (m['reference'] ?? '') as String,
+    notes: (m['notes'] ?? '') as String,
+    receiptNumber: (m['receiptNumber'] ?? '') as String,
+    deletedAt: (m['deletedAt'] ?? '') as String,
+    createdAt: m['createdAt'] as String?,
+  );
 }
 
 /* ============================================================
@@ -399,7 +458,14 @@ InvoiceStatus computeStatus(Invoice inv, Iterable<Payment> payments) {
 }
 
 class ClientSummary {
-  final int opening, billed, deposits, payments, paid, outstanding, invoiceCount, unpaidCount;
+  final int opening,
+      billed,
+      deposits,
+      payments,
+      paid,
+      outstanding,
+      invoiceCount,
+      unpaidCount;
   const ClientSummary({
     required this.opening,
     required this.billed,
@@ -413,11 +479,20 @@ class ClientSummary {
 }
 
 /// ملخّص العميل — يستثني الدفعات المخصصة لفواتير مسودة/ملغاة
-ClientSummary clientSummary(Client c, List<Invoice> allInvoices, List<Payment> allPayments) {
-  final inv = allInvoices.where((i) => i.clientId == c.id && i.countsInLedger).toList();
+ClientSummary clientSummary(
+  Client c,
+  List<Invoice> allInvoices,
+  List<Payment> allPayments,
+) {
+  final inv = allInvoices
+      .where((i) => i.clientId == c.id && i.countsInLedger)
+      .toList();
   final liveIds = inv.map((i) => i.id).toSet();
-  final pays = allPayments.where((p) =>
-      p.clientId == c.id && (p.invoiceId.isEmpty || liveIds.contains(p.invoiceId)));
+  final pays = allPayments.where(
+    (p) =>
+        p.clientId == c.id &&
+        (p.invoiceId.isEmpty || liveIds.contains(p.invoiceId)),
+  );
   var billed = 0, deposits = 0, unpaid = 0;
   for (final i in inv) {
     billed += i.totals.total;
@@ -472,6 +547,7 @@ class Statement {
   final String to;
   final int opening; // الرصيد قبل الفترة (الافتتاحي + حركة ما قبل from)
   final List<StatementRow> rows;
+
   /// الفواتير الواقعة داخل الفترة (للعرض التفصيلي في PDF الكشف) مرتبة بتاريخ الإصدار
   final List<Invoice> invoices;
   final int billed, paid, closing, count;
@@ -502,13 +578,21 @@ Statement buildStatement({
   String? issueDate,
   String title = 'كشف حساب',
 }) {
-  final inv = invoices.where((i) => i.clientId == client.id && i.countsInLedger).toList();
+  final inv = invoices
+      .where((i) => i.clientId == client.id && i.countsInLedger)
+      .toList();
   final liveIds = inv.map((i) => i.id).toSet();
   final pays = payments
-      .where((p) => p.clientId == client.id && (p.invoiceId.isEmpty || liveIds.contains(p.invoiceId)))
+      .where(
+        (p) =>
+            p.clientId == client.id &&
+            (p.invoiceId.isEmpty || liveIds.contains(p.invoiceId)),
+      )
       .toList();
 
-  bool inRange(String d) => (from.isEmpty || d.compareTo(from) >= 0) && (to.isEmpty || d.compareTo(to) <= 0);
+  bool inRange(String d) =>
+      (from.isEmpty || d.compareTo(from) >= 0) &&
+      (to.isEmpty || d.compareTo(to) <= 0);
   bool before(String d) => from.isNotEmpty && d.compareTo(from) < 0;
 
   // الرصيد الافتتاحي للفترة
@@ -524,16 +608,43 @@ Statement buildStatement({
   final events = <_Ev>[];
   for (final i in inv) {
     if (!inRange(i.issueDate)) continue;
-    events.add(_Ev(i.issueDate, 0, 'invoice', i.number, _invDesc(i), i.totals.total, 0));
+    events.add(
+      _Ev(i.issueDate, 0, 'invoice', i.number, _invDesc(i), i.totals.total, 0),
+    );
     if (i.deposit > 0) {
-      events.add(_Ev(i.issueDate, 1, 'payment', i.number, 'عربون مستلم — فاتورة ${i.number}', 0, i.deposit));
+      events.add(
+        _Ev(
+          i.issueDate,
+          1,
+          'payment',
+          i.number,
+          'عربون مستلم — فاتورة ${i.number}',
+          0,
+          i.deposit,
+        ),
+      );
     }
   }
   for (final p in pays) {
     if (!inRange(p.date)) continue;
-    final invNo = inv.where((i) => i.id == p.invoiceId).map((i) => i.number).firstOrNull;
-    final d = invNo != null ? 'دفعة (${p.method}) — فاتورة $invNo' : 'دفعة على الحساب (${p.method})';
-    events.add(_Ev(p.date, 2, 'payment', p.receiptNumber.isNotEmpty ? p.receiptNumber : p.reference, d, 0, p.amount));
+    final invNo = inv
+        .where((i) => i.id == p.invoiceId)
+        .map((i) => i.number)
+        .firstOrNull;
+    final d = invNo != null
+        ? 'دفعة (${p.method}) — فاتورة $invNo'
+        : 'دفعة على الحساب (${p.method})';
+    events.add(
+      _Ev(
+        p.date,
+        2,
+        'payment',
+        p.receiptNumber.isNotEmpty ? p.receiptNumber : p.reference,
+        d,
+        0,
+        p.amount,
+      ),
+    );
   }
   events.sort((a, b) {
     final c = a.date.compareTo(b.date);
@@ -548,10 +659,17 @@ Statement buildStatement({
     billed += e.debit;
     paid += e.credit;
     if (e.type == 'invoice') count++;
-    rows.add(StatementRow(
-      date: e.date, type: e.type, ref: e.ref, desc: e.desc,
-      debit: e.debit, credit: e.credit, balance: bal,
-    ));
+    rows.add(
+      StatementRow(
+        date: e.date,
+        type: e.type,
+        ref: e.ref,
+        desc: e.desc,
+        debit: e.debit,
+        credit: e.credit,
+        balance: bal,
+      ),
+    );
   }
   return Statement(
     number: number,
@@ -578,7 +696,9 @@ String _invDesc(Invoice i) {
   final b = StringBuffer('فاتورة ${i.number}');
   if (i.eventDate.isNotEmpty) {
     b.write(' — ${fmtDate(i.eventDate)}');
-    if (i.eventDateTo.isNotEmpty && i.eventDateTo != i.eventDate) b.write(' إلى ${fmtDate(i.eventDateTo)}');
+    if (i.eventDateTo.isNotEmpty && i.eventDateTo != i.eventDate) {
+      b.write(' إلى ${fmtDate(i.eventDateTo)}');
+    }
   }
   if (i.location.isNotEmpty) b.write(' — ${i.location}');
   return b.toString();
@@ -587,12 +707,243 @@ String _invDesc(Invoice i) {
 class _Ev {
   final String date, type, ref, desc;
   final int order, debit, credit;
-  _Ev(this.date, this.order, this.type, this.ref, this.desc, this.debit, this.credit);
+  _Ev(
+    this.date,
+    this.order,
+    this.type,
+    this.ref,
+    this.desc,
+    this.debit,
+    this.credit,
+  );
 }
 
 /* ============================================================
    إعدادات المؤسسة (الترويسة)
    ============================================================ */
+/* ============================================================
+   خطاب المطالبة المالية (مرن بالكامل)
+   ============================================================ */
+/// بند في خطاب المطالبة: وصف حر + مبلغ، ويمكن ربطه بفاتورة (يُعبّأ منها)
+class ClaimItem {
+  String id;
+  String desc;
+  int amount; // هللة
+  /// الفاتورة المرتبطة (اختياري) — للرجوع إليها فقط؛ المبلغ يبقى قابلًا للتعديل
+  String invoiceId;
+  String invoiceNumber;
+
+  ClaimItem({
+    String? id,
+    this.desc = '',
+    this.amount = 0,
+    this.invoiceId = '',
+    this.invoiceNumber = '',
+  }) : id = id ?? uid('ci_');
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'desc': desc,
+    'amount': amount,
+    'invoiceId': invoiceId,
+    'invoiceNumber': invoiceNumber,
+  };
+
+  factory ClaimItem.fromMap(Map m) => ClaimItem(
+    id: m['id'] as String?,
+    desc: (m['desc'] ?? '') as String,
+    amount: (m['amount'] as num?)?.toInt() ?? 0,
+    invoiceId: (m['invoiceId'] ?? '') as String,
+    invoiceNumber: (m['invoiceNumber'] ?? '') as String,
+  );
+}
+
+/// النصوص الافتراضية لخطاب المطالبة — مطابقة لنموذج المؤسسة المعتمد، وكلها قابلة للتعديل
+class ClaimDefaults {
+  static const subject = 'مطالبة بمستحقات مالية';
+  static const greeting = 'السلام عليكم ورحمة الله وبركاته،، وبعد:';
+
+  /// {org} اسم المؤسسة، {event} اسم المناسبة/الأعمال
+  static const body =
+      'يطيب لنا أن نتقدم إليكم بوافر الشكر والتقدير على ثقتكم الكريمة ب{org}، ونفيد سعادتكم بأنه قد تم الانتهاء من تنفيذ كامل أعمال وخدمات الضيافة الخاصة ب{event}، وتسليمها على الوجه المتفق عليه ودون أي ملاحظات.\n\n'
+      'وعليه، نأمل من سعادتكم التكرم بتوجيه من يلزم لاعتماد وصرف مستحقاتنا المالية عن الأعمال المنفذة، وقدرها ما هو مبيّن أدناه.';
+  static const closing =
+      'وتفضلوا بقبول فائق الاحترام والتقدير، سائلين المولى عز وجل دوام التوفيق، ومتطلعين إلى استمرار التعاون معكم في المناسبات القادمة.';
+  static const signTitle = 'الإدارة المالية';
+  static const honorific = 'المحترمين';
+}
+
+/// حالة المطالبة
+enum ClaimStatus { draft, sent, paid }
+
+const claimStatusLabel = {
+  ClaimStatus.draft: 'مسودة',
+  ClaimStatus.sent: 'مُرسلة',
+  ClaimStatus.paid: 'تم الصرف',
+};
+
+/// خطاب مطالبة مالية: كل عنصر فيه اختياري ومرن
+///  - الجهة: عميل مسجّل أو اسم حر (بلا تسجيل)
+///  - الموضوع، التحية، نص الخطاب، الخاتمة، التوقيع: نصوص حرة (بافتراضيات النموذج المعتمد)
+///  - البنود: يدوية أو مستوردة من فواتير العميل، مع إظهار/إخفاء عمود المرجع
+///  - الإجمالي بالتفقيط، البنك، الختم: مفاتيح إظهار
+class Claim {
+  String id;
+  String number;
+  String date; // ISO
+  /// العميل المسجّل (اختياري)
+  String clientId;
+
+  /// اسم الجهة كما يظهر في الخطاب (يُعبّأ من العميل ويمكن تعديله)
+  String recipient;
+
+  /// سطر «السادة / … المحترمين» — فارغ = «السادة / {recipient} {honorific}»
+  String addressLine;
+  String honorific;
+  String subject;
+  String greeting;
+  String body;
+
+  /// اسم المناسبة/الأعمال (يُستبدل به {event} في النص)
+  String eventName;
+  List<ClaimItem> items;
+  String closing;
+  String signName; // فارغ = اسم المؤسسة
+  String signTitle;
+  String notes; // ملاحظة إضافية أسفل الجدول (اختياري)
+  bool showTafqit;
+  bool showBank;
+  bool showStamp;
+
+  /// عمود «المرجع» (رقم الفاتورة) في الجدول — يظهر تلقائيًا عند وجود بنود مرتبطة بفواتير
+  bool showRefColumn;
+  String status;
+  String deletedAt;
+  String createdAt;
+  String updatedAt;
+
+  Claim({
+    String? id,
+    this.number = '',
+    String? date,
+    this.clientId = '',
+    this.recipient = '',
+    this.addressLine = '',
+    this.honorific = ClaimDefaults.honorific,
+    this.subject = ClaimDefaults.subject,
+    this.greeting = ClaimDefaults.greeting,
+    this.body = ClaimDefaults.body,
+    this.eventName = '',
+    List<ClaimItem>? items,
+    this.closing = ClaimDefaults.closing,
+    this.signName = '',
+    this.signTitle = ClaimDefaults.signTitle,
+    this.notes = '',
+    this.showTafqit = false,
+    this.showBank = true,
+    this.showStamp = true,
+    this.showRefColumn = true,
+    String? status,
+    this.deletedAt = '',
+    String? createdAt,
+    String? updatedAt,
+  }) : id = id ?? uid('cl_'),
+       date = date ?? todayISO(),
+       items = items ?? [],
+       status = status ?? ClaimStatus.draft.name,
+       createdAt = createdAt ?? DateTime.now().toIso8601String(),
+       updatedAt = updatedAt ?? DateTime.now().toIso8601String();
+
+  int get total => items.fold<int>(0, (s, i) => s + i.amount);
+  bool get isDeleted => deletedAt.isNotEmpty;
+  bool get hasRefs => items.any((i) => i.invoiceNumber.isNotEmpty);
+  ClaimStatus get claimStatus => ClaimStatus.values.firstWhere(
+    (s) => s.name == status,
+    orElse: () => ClaimStatus.draft,
+  );
+
+  /// سطر المخاطبة النهائي
+  String get salutation {
+    if (addressLine.trim().isNotEmpty) return addressLine.trim();
+    final r = recipient.trim();
+    if (r.isEmpty) return '';
+    return 'السادة / $r${honorific.trim().isNotEmpty ? '  ${honorific.trim()}' : ''}';
+  }
+
+  /// نص الخطاب بعد استبدال المتغيرات
+  String resolvedBody(Org org) => body
+      .replaceAll('{org}', org.name)
+      .replaceAll(
+        '{event}',
+        eventName.trim().isEmpty ? 'المناسبة' : eventName.trim(),
+      )
+      .replaceAll('{recipient}', recipient.trim())
+      .replaceAll('{total}', total.toString());
+
+  Map<String, dynamic> toMap() => {
+    'id': id,
+    'number': number,
+    'date': date,
+    'clientId': clientId,
+    'recipient': recipient,
+    'addressLine': addressLine,
+    'honorific': honorific,
+    'subject': subject,
+    'greeting': greeting,
+    'body': body,
+    'eventName': eventName,
+    'items': items.map((e) => e.toMap()).toList(),
+    'closing': closing,
+    'signName': signName,
+    'signTitle': signTitle,
+    'notes': notes,
+    'showTafqit': showTafqit,
+    'showBank': showBank,
+    'showStamp': showStamp,
+    'showRefColumn': showRefColumn,
+    'status': status,
+    'deletedAt': deletedAt,
+    'createdAt': createdAt,
+    'updatedAt': updatedAt,
+  };
+
+  factory Claim.fromMap(Map m) {
+    String s(String k, [String d = '']) => (m[k] ?? d).toString();
+    bool b(String k, bool d) => (m[k] as bool?) ?? d;
+    return Claim(
+      id: m['id'] as String?,
+      number: s('number'),
+      date: m['date'] as String?,
+      clientId: s('clientId'),
+      recipient: s('recipient'),
+      addressLine: s('addressLine'),
+      honorific: s('honorific', ClaimDefaults.honorific),
+      subject: s('subject', ClaimDefaults.subject),
+      greeting: s('greeting', ClaimDefaults.greeting),
+      body: s('body', ClaimDefaults.body),
+      eventName: s('eventName'),
+      items: ((m['items'] as List?) ?? [])
+          .whereType<Map>()
+          .map(ClaimItem.fromMap)
+          .toList(),
+      closing: s('closing', ClaimDefaults.closing),
+      signName: s('signName'),
+      signTitle: s('signTitle', ClaimDefaults.signTitle),
+      notes: s('notes'),
+      showTafqit: b('showTafqit', false),
+      showBank: b('showBank', true),
+      showStamp: b('showStamp', true),
+      showRefColumn: b('showRefColumn', true),
+      status: m['status'] as String?,
+      deletedAt: s('deletedAt'),
+      createdAt: m['createdAt'] as String?,
+      updatedAt: m['updatedAt'] as String?,
+    );
+  }
+
+  Claim copy() => Claim.fromMap(toMap());
+}
+
 class Org {
   String name;
   String nameEn;
@@ -608,14 +959,19 @@ class Org {
   String iban;
   bool showStamp;
   bool showWatermark;
+
   /// تفعيل ضريبة القيمة المضافة في المستندات (من الإعدادات)
   bool vatEnabled;
+
   /// نسبة الضريبة الافتراضية (نقاط أساس: 1500 = 15%)
   int vatRateBp;
+
   /// تفعيل حقل الخصم في المستندات
   bool discountEnabled;
+
   /// إظهار حقل العربون عند إنشاء الفاتورة
   bool depositEnabled;
+
   /// الثيم: night / dawn / charcoal
   String theme;
   String invPrefix;
@@ -629,33 +985,34 @@ class Org {
      'seq'      : تسلسلي  بادئة + رقم يبدأ من invStart  (INV-0001)
      'datetime' : تلقائي من التاريخ والوقت             (INV-20260509-143522)  */
   String numberingMode;
+
   /// إدراج السنة في الرقم التسلسلي: INV-2026-0001
   bool numberYear;
 
   /* ---- عناصر المستندات (ملاحظة 11أ): لا يظهر إلا ما فُعِّل ---- */
-  bool showBank;        // بيانات البنك و IBAN في التذييل
-  bool showVatNumber;   // الرقم الضريبي في الترويسة
-  bool showCr;          // السجل التجاري في الترويسة
-  bool showTerms;       // صندوق الشروط
-  bool showSignatures;  // خانات التوقيع
-  bool showTafqit;      // المبلغ كتابةً
-  bool showAck;         // إقرار الاستلام في الفاتورة
-  bool showRemaining;   // سطر المدفوع/المتبقي في الفاتورة
-  bool showEventBlock;  // بطاقة تفاصيل المناسبة
+  bool showBank; // بيانات البنك و IBAN في التذييل
+  bool showVatNumber; // الرقم الضريبي في الترويسة
+  bool showCr; // السجل التجاري في الترويسة
+  bool showTerms; // صندوق الشروط
+  bool showSignatures; // خانات التوقيع
+  bool showTafqit; // المبلغ كتابةً
+  bool showAck; // إقرار الاستلام في الفاتورة
+  bool showRemaining; // سطر المدفوع/المتبقي في الفاتورة
+  bool showEventBlock; // بطاقة تفاصيل المناسبة
 
   Org({
-    this.name = 'مؤسسة كيف الضيافة',
-    this.nameEn = 'KEIF ALDIAFA EST.',
-    this.cr = '4030499689',
+    String? name,
+    String? nameEn,
+    String? cr,
     this.vat = '',
     this.kingdom = 'المملكة العربية السعودية',
-    this.city = 'جدة',
-    this.website = 'keifaldiafa.com',
-    this.email = 'info@keifaldiafa.com',
-    this.phone = '0508252134',
-    this.bankName = 'البنك الأهلي السعودي',
-    this.bankAccount = '01400017244409',
-    this.iban = 'SA7310000001400017244409',
+    String? city,
+    String? website,
+    String? email,
+    String? phone,
+    String? bankName,
+    String? bankAccount,
+    String? iban,
     this.showStamp = true,
     this.showWatermark = true,
     this.vatEnabled = false,
@@ -667,8 +1024,9 @@ class Org {
     this.invPad = 4,
     this.invStart = 1,
     this.quotePrefix = 'QT-',
-    this.invoiceTerms = 'يُعتبر هذا المستند فاتورة رسمية صادرة من مؤسسة كيف الضيافة. تُسدَّد المبالغ المستحقة عبر التحويل البنكي على الحساب المذكور أدناه، مع ذكر رقم الفاتورة في وصف التحويل.',
-    this.quoteTerms = 'هذا العرض ساري لمدة 15 يومًا من تاريخه. الأسعار شاملة الخدمة والتجهيز. يُعتمد العرض بتأكيد العميل ودفع العربون، وتُصدر الفاتورة النهائية بعد التنفيذ.',
+    String? invoiceTerms,
+    this.quoteTerms =
+        'هذا العرض ساري لمدة 15 يومًا من تاريخه. الأسعار شاملة الخدمة والتجهيز. يُعتمد العرض بتأكيد العميل ودفع العربون، وتُصدر الفاتورة النهائية بعد التنفيذ.',
     this.numberingMode = 'seq',
     this.numberYear = false,
     this.showBank = true,
@@ -680,27 +1038,77 @@ class Org {
     this.showAck = false,
     this.showRemaining = true,
     this.showEventBlock = true,
-  });
+    this.claimPrefix = 'CLM-',
+    this.logoPath = '',
+    this.stampPath = '',
+  }) : name = name ?? Brand.current.orgName,
+       nameEn = nameEn ?? Brand.current.orgNameEn,
+       cr = cr ?? Brand.current.cr,
+       city = city ?? Brand.current.city,
+       website = website ?? Brand.current.website,
+       email = email ?? Brand.current.email,
+       phone = phone ?? Brand.current.phone,
+       bankName = bankName ?? Brand.current.bankName,
+       bankAccount = bankAccount ?? Brand.current.bankAccount,
+       iban = iban ?? Brand.current.iban,
+       invoiceTerms =
+           invoiceTerms ??
+           'يُعتبر هذا المستند فاتورة رسمية صادرة من ${name ?? Brand.current.orgName}. تُسدَّد المبالغ المستحقة عبر التحويل البنكي على الحساب المذكور أدناه، مع ذكر رقم الفاتورة في وصف التحويل.';
+
+  /// بادئة رقم خطاب المطالبة
+  String claimPrefix;
+
+  /// شعار/ختم مخصّص من الهاتف (مسار داخل مجلد التطبيق الخاص). فارغ = شعار النسخة الافتراضي
+  String logoPath;
+  String stampPath;
 
   Map<String, dynamic> toMap() => {
-        'name': name, 'nameEn': nameEn, 'cr': cr, 'vat': vat, 'kingdom': kingdom, 'city': city,
-        'website': website, 'email': email, 'phone': phone, 'bankName': bankName,
-        'bankAccount': bankAccount, 'iban': iban, 'showStamp': showStamp,
-        'showWatermark': showWatermark, 'vatEnabled': vatEnabled, 'vatRateBp': vatRateBp,
-        'discountEnabled': discountEnabled, 'depositEnabled': depositEnabled, 'theme': theme,
-        'invPrefix': invPrefix, 'invPad': invPad,
-        'invStart': invStart, 'quotePrefix': quotePrefix, 'invoiceTerms': invoiceTerms,
-        'quoteTerms': quoteTerms,
-        'numberingMode': numberingMode, 'numberYear': numberYear,
-        'showBank': showBank, 'showVatNumber': showVatNumber, 'showCr': showCr,
-        'showTerms': showTerms, 'showSignatures': showSignatures, 'showTafqit': showTafqit,
-        'showAck': showAck, 'showRemaining': showRemaining, 'showEventBlock': showEventBlock,
-      };
+    'name': name,
+    'nameEn': nameEn,
+    'cr': cr,
+    'vat': vat,
+    'kingdom': kingdom,
+    'city': city,
+    'website': website,
+    'email': email,
+    'phone': phone,
+    'bankName': bankName,
+    'bankAccount': bankAccount,
+    'iban': iban,
+    'showStamp': showStamp,
+    'showWatermark': showWatermark,
+    'vatEnabled': vatEnabled,
+    'vatRateBp': vatRateBp,
+    'discountEnabled': discountEnabled,
+    'depositEnabled': depositEnabled,
+    'theme': theme,
+    'invPrefix': invPrefix,
+    'invPad': invPad,
+    'invStart': invStart,
+    'quotePrefix': quotePrefix,
+    'invoiceTerms': invoiceTerms,
+    'quoteTerms': quoteTerms,
+    'numberingMode': numberingMode,
+    'numberYear': numberYear,
+    'showBank': showBank,
+    'showVatNumber': showVatNumber,
+    'showCr': showCr,
+    'showTerms': showTerms,
+    'showSignatures': showSignatures,
+    'showTafqit': showTafqit,
+    'showAck': showAck,
+    'showRemaining': showRemaining,
+    'showEventBlock': showEventBlock,
+    'claimPrefix': claimPrefix,
+    'logoPath': logoPath,
+    'stampPath': stampPath,
+  };
 
   factory Org.fromMap(Map? m) {
     final d = Org();
     if (m == null) return d;
-    String s(String k, String def) => (m[k] as String?)?.trim().isNotEmpty == true ? m[k] as String : def;
+    String s(String k, String def) =>
+        (m[k] as String?)?.trim().isNotEmpty == true ? m[k] as String : def;
     return Org(
       name: s('name', d.name),
       nameEn: s('nameEn', d.nameEn),
@@ -730,7 +1138,9 @@ class Org {
       numberingMode: (m['numberingMode'] as String?) ?? 'seq',
       numberYear: (m['numberYear'] as bool?) ?? false,
       showBank: (m['showBank'] as bool?) ?? true,
-      showVatNumber: (m['showVatNumber'] as bool?) ?? ((m['vat'] as String?)?.isNotEmpty ?? false),
+      showVatNumber:
+          (m['showVatNumber'] as bool?) ??
+          ((m['vat'] as String?)?.isNotEmpty ?? false),
       showCr: (m['showCr'] as bool?) ?? true,
       showTerms: (m['showTerms'] as bool?) ?? true,
       showSignatures: (m['showSignatures'] as bool?) ?? true,
@@ -738,8 +1148,12 @@ class Org {
       showAck: (m['showAck'] as bool?) ?? false,
       showRemaining: (m['showRemaining'] as bool?) ?? true,
       showEventBlock: (m['showEventBlock'] as bool?) ?? true,
+      claimPrefix: (m['claimPrefix'] as String?) ?? 'CLM-',
+      logoPath: (m['logoPath'] as String?) ?? '',
+      stampPath: (m['stampPath'] as String?) ?? '',
     );
   }
 
-  String get ibanSpaced => iban.replaceAllMapped(RegExp(r'.{4}'), (m) => '${m[0]} ').trim();
+  String get ibanSpaced =>
+      iban.replaceAllMapped(RegExp(r'.{4}'), (m) => '${m[0]} ').trim();
 }

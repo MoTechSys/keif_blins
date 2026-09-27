@@ -19,12 +19,22 @@ class StatementsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final store = context.watch<Store>();
-    final clients = [...store.clients]..sort((a, b) => store.summary(b).outstanding.compareTo(store.summary(a).outstanding));
+    final clients = [...store.clients]
+      ..sort(
+        (a, b) => store
+            .summary(b)
+            .outstanding
+            .compareTo(store.summary(a).outstanding),
+      );
 
     return Scaffold(
       appBar: AppBar(title: const Text('كشوف الحساب')),
       body: clients.isEmpty
-          ? const EmptyState(icon: Icons.account_balance_wallet_outlined, title: 'لا يوجد عملاء', hint: 'أضف عملاء وفواتير ثم أصدر كشوف الحساب من هنا')
+          ? const EmptyState(
+              icon: Icons.account_balance_wallet_outlined,
+              title: 'لا يوجد عملاء',
+              hint: 'أضف عملاء وفواتير ثم أصدر كشوف الحساب من هنا',
+            )
           : ListView.separated(
               padding: const EdgeInsets.fromLTRB(14, 8, 14, 30),
               itemCount: clients.length + 1,
@@ -33,32 +43,64 @@ class StatementsScreen extends StatelessWidget {
                 if (i == 0) {
                   return Container(
                     padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(color: C.gold.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(14), border: Border.all(color: C.gold.withValues(alpha: 0.35))),
-                    child: Row(children: [
-                      Icon(Icons.info_outline, color: C.gold, size: 20),
-                      const SizedBox(width: 10),
-                      Expanded(child: Text('اختر عميلًا لإصدار كشف حساب (مختصر أو تفصيلي) بالفترة التي تريدها: هذا الشهر، الشهر الماضي، الكل، أو مخصصة.', style: TextStyle(color: C.text, fontSize: 13))),
-                    ]),
+                    decoration: BoxDecoration(
+                      color: C.gold.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: C.gold.withValues(alpha: 0.35)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.info_outline, color: C.gold, size: 20),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'اختر عميلًا لإصدار كشف حساب (مختصر أو تفصيلي) بالفترة التي تريدها: هذا الشهر، الشهر الماضي، الكل، أو مخصصة.',
+                            style: TextStyle(color: C.text, fontSize: 13),
+                          ),
+                        ),
+                      ],
+                    ),
                   );
                 }
                 final c = clients[i - 1];
                 final s = store.summary(c);
                 return GoldCard(
                   onTap: () => openStatement(context, c),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  child: Row(children: [
-                    Icon(Icons.account_balance_wallet_rounded, color: C.gold),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Text(c.name, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
-                        Text('${s.invoiceCount} فاتورة • ${s.unpaidCount} غير مسددة', style: TextStyle(color: C.muted, fontSize: 12)),
-                      ]),
-                    ),
-                    Money(s.outstanding, size: 15, color: s.outstanding > 0 ? C.text : C.green),
-                    const SizedBox(width: 6),
-                    Icon(Icons.chevron_left, color: C.muted),
-                  ]),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.account_balance_wallet_rounded, color: C.gold),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              c.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
+                              ),
+                            ),
+                            Text(
+                              '${s.invoiceCount} فاتورة • ${s.unpaidCount} غير مسددة',
+                              style: TextStyle(color: C.muted, fontSize: 12),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Money(
+                        s.outstanding,
+                        size: 15,
+                        color: s.outstanding > 0 ? C.text : C.green,
+                      ),
+                      const SizedBox(width: 6),
+                      Icon(Icons.chevron_left, color: C.muted),
+                    ],
+                  ),
                 );
               },
             ),
@@ -74,7 +116,8 @@ Future<void> openStatement(BuildContext context, Client c) async {
   var from = '';
   var to = '';
   final now = DateTime.now();
-  String iso(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+  String iso(DateTime d) =>
+      '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   void applyPreset(String p) {
     preset = p;
@@ -96,47 +139,117 @@ Future<void> openStatement(BuildContext context, Client c) async {
     isScrollControlled: true,
     builder: (ctx) => StatefulBuilder(
       builder: (ctx, setS) => Padding(
-        padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + MediaQuery.of(ctx).viewInsets.bottom),
-        child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('كشف حساب — ${c.name}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 12),
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            for (final p in [('all', 'كل الفواتير'), ('month', 'هذا الشهر'), ('last', 'الشهر الماضي'), ('custom', 'مخصصة')])
-              ChoiceChip(label: Text(p.$2), selected: preset == p.$1, showCheckmark: false, onSelected: (_) => setS(() => applyPreset(p.$1))),
-          ]),
-          if (preset == 'custom') ...[
+        padding: EdgeInsets.fromLTRB(
+          16,
+          0,
+          16,
+          16 + MediaQuery.of(ctx).viewInsets.bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'كشف حساب — ${c.name}',
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w900),
+            ),
             const SizedBox(height: 12),
-            Row(children: [
-              Expanded(child: _DateBtn('من', from, (v) => setS(() => from = v))),
-              const SizedBox(width: 10),
-              Expanded(child: _DateBtn('إلى', to, (v) => setS(() => to = v))),
-            ]),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final p in [
+                  ('all', 'كل الفواتير'),
+                  ('month', 'هذا الشهر'),
+                  ('last', 'الشهر الماضي'),
+                  ('custom', 'مخصصة'),
+                ])
+                  ChoiceChip(
+                    label: Text(p.$2),
+                    selected: preset == p.$1,
+                    showCheckmark: false,
+                    onSelected: (_) => setS(() => applyPreset(p.$1)),
+                  ),
+              ],
+            ),
+            if (preset == 'custom') ...[
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _DateBtn('من', from, (v) => setS(() => from = v)),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _DateBtn('إلى', to, (v) => setS(() => to = v)),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 14),
+            Text(
+              'نوع الكشف',
+              style: TextStyle(
+                color: C.muted,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                ChoiceChip(
+                  label: const Text('مختصر (مدين / دائن / رصيد)'),
+                  selected: !detailed,
+                  showCheckmark: false,
+                  onSelected: (_) => setS(() => detailed = false),
+                ),
+                ChoiceChip(
+                  label: const Text('تفصيلي (بنود كل فاتورة ودفعاتها)'),
+                  selected: detailed,
+                  showCheckmark: false,
+                  onSelected: (_) => setS(() => detailed = true),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(ctx, true),
+              icon: const Icon(Icons.picture_as_pdf_rounded),
+              label: const Text('إصدار الكشف'),
+            ),
           ],
-          const SizedBox(height: 14),
-          Text('نوع الكشف', style: TextStyle(color: C.muted, fontSize: 12, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          Wrap(spacing: 8, runSpacing: 8, children: [
-            ChoiceChip(label: const Text('مختصر (مدين / دائن / رصيد)'), selected: !detailed, showCheckmark: false, onSelected: (_) => setS(() => detailed = false)),
-            ChoiceChip(label: const Text('تفصيلي (بنود كل فاتورة ودفعاتها)'), selected: detailed, showCheckmark: false, onSelected: (_) => setS(() => detailed = true)),
-          ]),
-          const SizedBox(height: 16),
-          FilledButton.icon(onPressed: () => Navigator.pop(ctx, true), icon: const Icon(Icons.picture_as_pdf_rounded), label: const Text('إصدار الكشف')),
-        ]),
+        ),
       ),
     ),
   );
   if (ok != true || !context.mounted) return;
 
-  final st = buildStatement(client: c, invoices: store.docs, payments: store.payments, from: from, to: to, number: store.statementNumber(c));
+  final st = buildStatement(
+    client: c,
+    invoices: store.docs,
+    payments: store.payments,
+    from: from,
+    to: to,
+    number: store.statementNumber(c),
+  );
   Navigator.push(
     context,
     MaterialPageRoute(
       builder: (_) => PreviewScreen(
         title: '${detailed ? 'كشف حساب تفصيلي' : 'كشف حساب'} — ${c.name}',
-        fileName: store.statementFileName(c, date: st.issueDate, detailed: detailed),
+        fileName: store.statementFileName(
+          c,
+          date: st.issueDate,
+          detailed: detailed,
+        ),
         message: ShareService.statementMessage(st, store.org),
         build: () async => detailed
-            ? (await DocPdf.create(store.org)).statementDetailed(st, store.payments)
+            ? (await DocPdf.create(
+                store.org,
+              )).statementDetailed(st, store.payments)
             : (await DocPdf.create(store.org)).statement(st),
         kind: FileKind.statement,
         year: FileService.yearOf(st.issueDate),
@@ -151,14 +264,20 @@ class _DateBtn extends StatelessWidget {
   const _DateBtn(this.label, this.value, this.set);
   @override
   Widget build(BuildContext context) => InkWell(
-        borderRadius: BorderRadius.circular(12),
-        onTap: () async {
-          final v = await pickDate(context, value);
-          if (v != null) set(v);
-        },
-        child: InputDecorator(
-          decoration: InputDecoration(labelText: label, prefixIcon: Icon(Icons.event_outlined, color: C.muted, size: 20)),
-          child: Text(value.isEmpty ? '—' : fmtDate(value), style: const TextStyle(fontWeight: FontWeight.w700)),
-        ),
-      );
+    borderRadius: BorderRadius.circular(12),
+    onTap: () async {
+      final v = await pickDate(context, value);
+      if (v != null) set(v);
+    },
+    child: InputDecorator(
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(Icons.event_outlined, color: C.muted, size: 20),
+      ),
+      child: Text(
+        value.isEmpty ? '—' : fmtDate(value),
+        style: const TextStyle(fontWeight: FontWeight.w700),
+      ),
+    ),
+  );
 }
