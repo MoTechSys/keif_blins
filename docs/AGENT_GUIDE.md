@@ -1,6 +1,6 @@
 # دليل الوكيل — كيف تعمل على هذا المشروع بالدقة التي يطلبها المستخدم
 
-هذا الملف يصف **طريقة العمل** لا الكود. الكود موصوف في `README.md`، والتاريخ والقرارات في `CHANGELOG.md`.
+هذا الملف يصف **طريقة العمل** لا الكود. المنظومة (3 مستودعات) في `ECOSYSTEM.md`، الكود في `README.md`، والتاريخ والقرارات في `CHANGELOG.md`.
 
 ## 1. المستخدم وما يتوقعه
 
@@ -58,11 +58,13 @@ for i, p in enumerate(d):
 
 ## 6. الإصدار والنشر
 
-1. `pubspec.yaml` → `version: X.Y.Z+N`، وحدّث `SettingsHub.version` في `settings_screen.dart`.
-2. CHANGELOG: حوّل «غير منشور» إلى `## [X.Y.Z+N] — التاريخ`.
-3. `flutter build apk --release --split-per-abi` (+ الشاملة إن لزم). تحقق: `aapt dump badging` (versionCode/Name) و`apksigner verify`.
-4. وسم `vX.Y.Z` + إصدار GitHub (عبر REST API؛ `gh` غير مثبت) مع ملاحظات عربية وجدول «أي ملف أُنزّل» وSHA-256 لكل ملف. أعد تحميل الملف من GitHub وقارن الـ SHA.
-5. مفاتيح التوقيع في `android/key.properties` و`android/release-key.jks` — **غير مرفوعة** (مُتجاهلة في git) ولا تُرفع أبدًا.
+الخطوات الكاملة في `ECOSYSTEM.md` («إصدار تحديث جديد»). الخلاصة:
+1. `pubspec.yaml` → `version: X.Y.Z+N` (N أعلى دائمًا)، و`SettingsHub.version` في `settings_screen.dart`.
+2. انسخ المفتاح من **diafa-signing-keys** إلى `android/` (مُتجاهل في git — لا يُرفع هنا أبدًا).
+3. ابنِ الـ flavorين (`keif`, `osool`) بـ `--split-per-abi --target-platform android-arm,android-arm64`.
+4. تحقق: `apksigner verify --print-certs` (SHA-1 `C8:74:…:F9:AA`) و`aapt2 dump badging` (الحزمة + versionCode).
+5. انشر الإصدار في **diafa-apps** (ليس هنا) عبر REST API، ثم نزّل الملفات وقارن SHA-256.
+6. حدّث CHANGELOG هنا وفي مجلدي diafa-apps.
 
 ## 7. مواضع يسهل الخطأ فيها
 

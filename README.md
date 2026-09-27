@@ -1,15 +1,21 @@
-# كيف الضيافة — Keif Aldiafa
+# كيف الضيافة / أصول الضيافة — الكود المصدري
 
-تطبيق Flutter/Android لمؤسسة **كيف الضيافة** (ضيافة مناسبات، جدة): فواتير، عروض أسعار، سندات قبض، كشوف حساب (مختصر وتفصيلي) بصيغة PDF رسمية، مع تخزين محلي كامل بلا خادم.
+> 🗺️ **هذا واحد من 3 مستودعات.** اقرأ [`ECOSYSTEM.md`](ECOSYSTEM.md) أولًا:
+> - **keif_blins** (هنا) — الكود المصدري
+> - [diafa-apps](https://github.com/MoTechSys/diafa-apps) — ملفات APK + القفل عن بُعد (`license.json`)
+> - [diafa-signing-keys](https://github.com/MoTechSys/diafa-signing-keys) (خاص) — مفتاح التوقيع
+
+كود Flutter واحد يبني **تطبيقَي أندرويد منفصلين** (flavors): **كيف الضيافة** و**أصول الضيافة** (ضيافة مناسبات، جدة): فواتير، عروض أسعار، سندات قبض، كشوف حساب، خطابات مطالبة — PDF رسمي، تخزين محلي (SQLite) بلا خادم، نسخ احتياطي يومي مُتحقَّق + Google Drive، قفل عن بُعد.
 
 | | |
 |---|---|
-| الإصدار الحالي | **2.2.0+4** — [صفحة الإصدار والـ APK](https://github.com/MoTechSys/keif_blins/releases/tag/v2.2.0) |
-| الحزمة | `com.hospitalitybilling.keif_diafa` — اسم المشروع `keif_diafa` |
+| الإصدار الحالي | **2.4.0+2400** — [التحميل من diafa-apps](https://github.com/MoTechSys/diafa-apps/releases/latest) (إصدارات ≤2.2.0 هنا قديمة وبمفتاح مختلف) |
+| الحزمتان | `com.hospitalitybilling.keif_diafa` (flavor `keif`) · `com.hospitalitybilling.osool_diafa` (flavor `osool`) — اسم مشروع Dart `keif_diafa` |
+| المنصة | **أندرويد فقط** (arm64 + armv7). الويب للمعاينة فقط |
 | البيئة (مثبّتة، لا تُحدَّث) | Flutter **3.35.4** · Dart **3.9.2** · Android SDK 35 · JDK 17 |
 | اللغة مع المستخدم | **العربية دائمًا** (المستخدم: «ياغالي») |
 
-> **لوكيل جديد:** اقرأ هذا الملف ثم `docs/AGENT_GUIDE.md` (طريقة العمل ومعايير الدقة) ثم `CHANGELOG.md` (كل قرار وسببه). لا تبدأ أي تعديل قبل ذلك.
+> **لوكيل جديد:** اقرأ `ECOSYSTEM.md` ثم هذا الملف ثم `docs/AGENT_GUIDE.md` (طريقة العمل ومعايير الدقة) ثم `CHANGELOG.md` (كل قرار وسببه). لا تبدأ أي تعديل قبل ذلك.
 
 ## تشغيل سريع
 
@@ -17,38 +23,43 @@
 cd /home/user/flutter_app
 flutter pub get
 flutter analyze                      # يجب: No issues found
-flutter test                         # يجب: All tests passed (32)
-flutter build apk --release --split-per-abi   # arm64 ≈ 10.9 MB
+flutter test                         # يجب: All tests passed (102)
+# البناء يحتاج مفتاح التوقيع من diafa-signing-keys (انظر ECOSYSTEM.md)
+flutter build apk --release --flavor keif  --dart-define=BRAND=keif  --split-per-abi --target-platform android-arm,android-arm64
+flutter build apk --release --flavor osool --dart-define=BRAND=osool --split-per-abi --target-platform android-arm,android-arm64
 ```
 
 اختبارات PDF تكتب ملفاتها في `build/test_pdfs/*.pdf` — هذه هي الطريقة المعتمدة لفحص أي تغيير في المستندات (انظر دليل الوكيل).
 
-## بنية المشروع (5.6k سطر Dart)
+## بنية المشروع (~18.7k سطر Dart)
 
 ```
 lib/
-  main.dart                RTL + عربية + الثيم → Shell
+  main.dart                RTL + عربية + الثيم + المزوّدات (Store, LockService, LicenseService) → Shell
   core/
+    brand.dart             هوية التطبيقين (keif/osool): الاسم، قاعدة البيانات، المجلد، الشعار، بيانات المؤسسة
     money.dart             المال بالهللات (int)، الضريبة بالـ basis points، تفقيط عربي
-    models.dart            Client / LineItem / Invoice(kind: invoice|quotation) / Payment / Org / Statement + buildStatement
-    store.dart             Hive: clients, docs, payments, org + ترقيم + سلة محذوفات + نسخ احتياطي JSON
-    file_service.dart      مجلد الهاتف Documents/كيف الضيافة/<النوع>/<السنة>/
+    models.dart            Client / LineItem / Invoice(invoice|quotation) / Payment / Claim / Org / Statement
+    db.dart + db_factory*  AppDb: SqliteDb (WAL, synchronous=FULL, معاملات) على أندرويد · HiveDb للويب + ترحيل Hive القديم
+    store.dart             الحالة كاملة: ترقيم، سلة محذوفات 30 يومًا، مطالبات، معاملات ذرّية
+    backup_service.dart    نسخ JSON بغلاف SHA-256 + تحقق بالقراءة الراجعة + نسخة يومية تلقائية (30)
+    drive_service.dart     Google Drive (appDataFolder لكل مستخدم) — يحتاج إعداد OAuth (ECOSYSTEM.md)
+    file_service.dart      /storage/emulated/0/<اسم التطبيق>/{فواتير,عروض,مطالبات,كشوف,سندات,نسخ}
+    license_service.dart   القفل عن بُعد من diafa-apps/<المجلد>/license.json
     lock_service.dart      قفل PIN (SHA-256 + salt)
     share_service.dart     رسائل واتساب + مشاركة/طباعة
   pdf/
-    official_theme.dart    الثيم الرسمي المعتمد (O: ألوان، officialTable RTL، ترويسة/تذييل، بطاقات)
-    documents.dart         DocPdf: invoice() · statement() · statementDetailed() · receipt()
-    pdf_theme.dart         الثيم «الملكي» القديم — لم يعد مستخدمًا في المستندات (مرجع فقط)
-  ui/                      shell (5 تبويبات) · drawer · preview_screen · theme (3 ثيمات) · widgets
-  ui/screens/              home, clients, docs, doc_form, doc_detail, payments, payment_form,
-                           statements, settings (hub + doc settings + appearance + security + trash + about + backup),
-                           files, lock, signin
-third_party/pdf/           نسخة pdf 3.12.0 معدّلة (إصلاح مسافات RTL) — انظر KEIF_PATCH.md
-test/                      money · models · store · security · pdf · pdf_stress (32 اختبارًا)
-docs/
-  AGENT_GUIDE.md           طريقة العمل، معايير الدقة، حلقة التحقق البصري، القرارات الثابتة
-  reference/               النماذج المرجعية التي اعتمدها المستخدم (صور مصغّرة)
-  renders/                 معاينات المخرجات الحالية لكل مستند
+    official_theme.dart    الثيم الرسمي (officialTable RTL، ترويسة/تذييل)
+    documents.dart         DocPdf: invoice · statement · statementDetailed · receipt · claim
+  ui/                      shell (بوابات: ترخيص ← دخول ← مجلد ← قفل PIN) · drawer · preview · theme · widgets
+  ui/screens/              home, clients, docs, doc_form, doc_detail, payments, payment_form, statements,
+                           claims, settings (+backup/trash/security/appearance/about), files, lock,
+                           license, signin, storage_setup
+android/app/src/osool/     أيقونات أصول الضيافة (flavor)
+assets/brand/{keif,osool}/ الشعار، الختم، شعار PDF لكل تطبيق
+third_party/pdf/           pdf 3.12.0 معدّلة (مسافات RTL) — KEIF_PATCH.md
+test/                      money · models · store · security · pdf · pdf_stress · brand · license · ui_smoke (102)
+docs/                      AGENT_GUIDE.md · reference/ (نماذج المستخدم) · renders/ (معاينات المخرجات)
 ```
 
 ## المستندات (PDF)
@@ -68,4 +79,5 @@ docs/
 - الكشف المختصر: دفتر كلاسيكي (مدين أحمر / دائن أخضر / رصيد)، بلا «رصيد افتتاحي» إلا «رصيد سابق قبل الفترة» عند التصفية بفترة.
 - الخطوط في `assets/fonts/` معالَجة خصيصًا لمكتبة pdf — **لا تستبدلها** بنسخ Google الأصلية.
 - الحزمة تُنشر **لكل معمارية** (`--split-per-abi`)؛ الشاملة ثلاثة أضعاف الحجم لأنها تحمل المحرك 3 مرات.
-- خارج النطاق: Firebase، حسابات سحابية، الويب كمنتج (للمعاينة فقط).
+- خارج النطاق: Firebase، iOS، الويب كمنتج (للمعاينة فقط).
+- **لا تغيّر أبدًا:** أسماء الحزم، مفتاح التوقيع، مسار ملفات القفل في diafa-apps — كلها مقروءة من التطبيقات المثبّتة.
