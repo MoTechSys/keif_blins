@@ -710,36 +710,18 @@ class _DocFormState extends State<DocForm> {
                 ],
               ),
             ),
-            const SizedBox(height: 4),
-            // مشتريات خارجية — مخفية خلف زر صغير حتى لا تزدحم البطاقة
-            if (c.extOpen || c.external.text.isNotEmpty)
+            // مشتريات خارجية — أُزيل زر الإضافة بطلب العميل (كل إضافة = بند مستقل).
+            // يبقى الحقل ظاهرًا فقط في المستندات القديمة التي تحمل قيمة، حتى لا تختفي قيمة موجودة بصمت.
+            if (c.hasExternal) ...[
+              const SizedBox(height: 4),
               Field(
                 'مشتريات خارجية (ر.س)',
                 controller: c.external,
                 type: const TextInputType.numberWithOptions(decimal: true),
                 icon: Icons.shopping_bag_outlined,
                 onChanged: (_) => setState(() {}),
-              )
-            else
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: TextButton.icon(
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    minimumSize: const Size(0, 32),
-                  ),
-                  onPressed: () => setState(() => c.extOpen = true),
-                  icon: Icon(
-                    Icons.add_shopping_cart_rounded,
-                    size: 16,
-                    color: C.text3,
-                  ),
-                  label: Text(
-                    'إضافة مشتريات خارجية',
-                    style: TextStyle(color: C.text3, fontSize: 12),
-                  ),
-                ),
               ),
+            ],
           ],
         ),
       ),
@@ -909,7 +891,9 @@ class _ItemCtl {
   final String id;
   final TextEditingController desc, price, qty, external;
   String unit;
-  bool extOpen;
+
+  /// البند القديم يحمل مشتريات خارجية ⇐ يظهر حقلها للتعديل (لا زر إضافة للبنود الجديدة)
+  final bool hasExternal;
   _ItemCtl(LineItem li)
     : id = li.id,
       desc = TextEditingController(text: li.desc),
@@ -921,7 +905,7 @@ class _ItemCtl {
         text: li.external == 0 ? '' : fmt(li.external, trimZeros: true),
       ),
       unit = li.unitLabel,
-      extOpen = li.external != 0;
+      hasExternal = li.external != 0;
 
   void dispose() {
     desc.dispose();
