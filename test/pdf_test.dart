@@ -80,6 +80,72 @@ void main() {
     await save('invoice.pdf', bytes);
   });
 
+  test(
+    'invoice PDF with custom units (موقع/طاولة) renders and prints them',
+    () async {
+      // وحدات مخصّصة من الإعدادات — يجب أن تظهر في عمود الكمية عند اختلافها بين البنود
+      final custom = Invoice(
+        id: 'i-units',
+        number: 'INV-0042',
+        clientId: 'c1',
+        clientName: client.name,
+        issueDate: '2026-09-28',
+        eventDate: '2026-10-05',
+        location: 'جدة — موقعان',
+        items: [
+          LineItem(
+            desc: 'ضيافة كاملة للموقع',
+            unitPrice: 450000,
+            qty: 2,
+            unitLabel: 'موقع',
+          ),
+          LineItem(
+            desc: 'تجهيز طاولات الضيافة',
+            unitPrice: 12000,
+            qty: 15,
+            unitLabel: 'طاولة',
+          ),
+          LineItem(
+            desc: 'إقامة طاقم الخدمة',
+            unitPrice: 30000,
+            qty: 3,
+            unitLabel: 'ليلة فاخرة',
+          ),
+        ],
+      );
+      final pdf = await DocPdf.create(org);
+      final bytes = await pdf.invoice(custom, const [], client: client);
+      expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
+      await save('invoice_custom_units.pdf', bytes);
+      // نفس الوحدة لكل البنود ⇐ رأس العمود يحمل الوحدة ولا تتكرر بجوار كل كمية
+      final same = Invoice(
+        id: 'i-units-same',
+        number: 'INV-0043',
+        clientId: 'c1',
+        clientName: client.name,
+        issueDate: '2026-09-28',
+        items: [
+          LineItem(
+            desc: 'ضيافة الموقع الأول',
+            unitPrice: 450000,
+            qty: 1,
+            unitLabel: 'موقع',
+          ),
+          LineItem(
+            desc: 'ضيافة الموقع الثاني',
+            unitPrice: 380000,
+            qty: 1,
+            unitLabel: 'موقع',
+          ),
+        ],
+      );
+      await save(
+        'invoice_same_unit.pdf',
+        await pdf.invoice(same, const [], client: client),
+      );
+    },
+  );
+
   test('quotation PDF renders', () async {
     final q = inv.copy()
       ..kind = DocKind.quotation

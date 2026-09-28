@@ -195,13 +195,20 @@ class DocPdf {
       'ساعة' => 'عدد الساعات',
       'شخص' => 'عدد الأشخاص',
       'وجبة' => 'عدد الوجبات',
-      _ => 'الكمية',
+      // وحدة مخصّصة موحّدة لكل البنود (موقع/طاولة/…): لا نعرف جمعها العربي، فنضعها بين قوسين
+      // في الرأس ولا نكررها بجوار كل كمية. الفارغ يبقى «الكمية».
+      _ => u.trim().isEmpty ? 'الكمية' : 'الكمية ($u)',
     };
   }
 
+  /// هل تختلف الوحدات بين البنود؟ (عندها تُكتب الوحدة بجوار كل كمية)
+  bool _mixedUnits(Invoice inv) =>
+      inv.items.isNotEmpty &&
+      !inv.items.every((i) => i.unitLabel == inv.items.first.unitLabel);
+
   pw.Widget _itemsTable(Invoice inv, bool hasExt) {
     final qtyHead = _qtyHeader(inv);
-    final mixedUnits = qtyHead == 'الكمية';
+    final mixedUnits = _mixedUnits(inv);
     // الأعمدة من اليمين: م | الوصف | الكمية | السعر | [مشتريات خارجية] | الإجمالي
     final widths = <int, pw.TableColumnWidth>{
       0: const pw.FixedColumnWidth(24),
@@ -724,7 +731,7 @@ class DocPdf {
           ? '${t.vatRateBp ~/ 100}'
           : (t.vatRateBp / 100).toStringAsFixed(1);
       final qtyHead = _qtyHeader(inv);
-      final mixedUnits = qtyHead == 'الكمية';
+      final mixedUnits = _mixedUnits(inv);
       final meta = <(String, String, bool)>[
         if (inv.eventDate.isNotEmpty)
           ('تاريخ الفعالية', _eventRange(inv), true),

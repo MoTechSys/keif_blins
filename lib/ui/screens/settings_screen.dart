@@ -29,7 +29,7 @@ import 'lock_screen.dart';
    مركز الإعدادات (ملاحظة 4/12) — إعدادات حقيقية فقط
    ============================================================ */
 class SettingsHub extends StatelessWidget {
-  static const version = '2.4.0';
+  static const version = '2.5.0';
   const SettingsHub({super.key});
 
   @override
@@ -54,7 +54,7 @@ class SettingsHub extends StatelessWidget {
           DrawerItem(
             Ic.invoice,
             'إعدادات الفواتير',
-            'الحسابات، الترقيم، الشروط، الختم والشعار، عناصر المستند',
+            'الحسابات، الوحدات، الترقيم، الشروط، الختم والشعار، عناصر المستند',
             onTap: () => open(const DocSettingsScreen()),
           ),
           DrawerItem(
@@ -102,7 +102,7 @@ class DocSettingsScreen extends StatefulWidget {
 class _DocSettingsScreenState extends State<DocSettingsScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tc = TabController(
-    length: 4,
+    length: 5,
     vsync: this,
     initialIndex: widget.initialTab,
   );
@@ -123,6 +123,7 @@ class _DocSettingsScreenState extends State<DocSettingsScreen>
           tabAlignment: TabAlignment.center,
           tabs: const [
             Tab(text: 'الحسابات'),
+            Tab(text: 'الوحدات'),
             Tab(text: 'الترقيم'),
             Tab(text: 'عناصر المستند'),
             Tab(text: 'الختم والشعار'),
@@ -133,6 +134,7 @@ class _DocSettingsScreenState extends State<DocSettingsScreen>
         controller: _tc,
         children: const [
           _CalcTab(),
+          _UnitsTab(),
           _NumberingTab(),
           _ElementsTab(),
           _StampTab(),
@@ -164,6 +166,124 @@ Widget _hint(String t) => Padding(
   padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
   child: Text(t, style: TextStyle(color: C.text2, fontSize: 12.5, height: 1.6)),
 );
+
+/// تبويب الوحدات — وحدات البنود (فترة/يوم/شخص/موقع…) قابلة للإضافة والتعديل والحذف والترتيب
+class _UnitsTab extends StatelessWidget {
+  const _UnitsTab();
+
+  Future<void> _save(Store store, List<String> units) =>
+      store.saveOrg(store.org..units = normalizeUnits(units));
+
+  @override
+  Widget build(BuildContext context) {
+    final store = context.watch<Store>();
+    final units = store.org.effectiveUnits;
+    final isDefault = units.join('\u0000') == unitLabels.join('\u0000');
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 30),
+      children: [
+        _hint(
+          'هذه الوحدات تظهر كأزرار عند إضافة بند في الفاتورة أو عرض السعر. '
+          'الوحدة تُضرب في الكمية (مثال: موقع × 2). اسحب من المقبض لإعادة الترتيب. '
+          'حذف وحدة لا يغيّر المستندات القديمة التي استخدمتها.',
+        ),
+        const SectionTitle('الوحدات الحالية'),
+        GoldCard(
+          padding: EdgeInsets.zero,
+          child: ReorderableListView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            buildDefaultDragHandles: false,
+            itemCount: units.length,
+            onReorder: (a, b) {
+              final l = List.of(units);
+              final u = l.removeAt(a);
+              l.insert(b > a ? b - 1 : b, u);
+              _save(store, l);
+            },
+            itemBuilder: (ctx, i) => ListTile(
+              key: ValueKey('unit-${units[i]}'),
+              leading: ReorderableDragStartListener(
+                index: i,
+                child: Icon(Icons.drag_indicator, color: C.text3),
+              ),
+              title: Text(
+                units[i],
+                style: TextStyle(fontWeight: FontWeight.w800, color: C.text),
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'تعديل',
+                    icon: Icon(Icons.edit_outlined, color: C.text2, size: 20),
+                    onPressed: () async {
+                      final n = await askUnitName(
+                        context,
+                        initial: units[i],
+                        existing: units,
+                      );
+                      if (n == null || n == units[i]) return;
+                      final l = List.of(units)..[i] = n;
+                      _save(store, l);
+                    },
+                  ),
+                  IconButton(
+                    tooltip: 'حذف',
+                    icon: Icon(
+                      Icons.delete_outline,
+                      color: units.length == 1 ? C.text3 : C.danger,
+                      size: 20,
+                    ),
+                    onPressed: units.length == 1
+                        ? null
+                        : () async {
+                            final ok = await confirm(
+                              context,
+                              'حذف الوحدة «${units[i]}»؟',
+                              'لن تظهر في البنود الجديدة. المستندات القديمة لا تتأثر.',
+                            );
+                            if (!ok) return;
+                            final l = List.of(units)..removeAt(i);
+                            _save(store, l);
+                          },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        FilledButton.icon(
+          onPressed: () async {
+            final n = await askUnitName(context, existing: units);
+            if (n == null) return;
+            _save(store, [...units, n]);
+          },
+          icon: const Icon(Icons.add),
+          label: const Text('إضافة وحدة'),
+        ),
+        if (!isDefault) ...[
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () async {
+              final ok = await confirm(
+                context,
+                'استعادة الوحدات الافتراضية؟',
+                'ستُستبدل قائمتك الحالية بـ: ${unitLabels.join('، ')}.',
+                ok: 'استعادة',
+                danger: false,
+              );
+              if (ok) _save(store, unitLabels);
+            },
+            icon: const Icon(Icons.restore),
+            label: const Text('استعادة الافتراضي'),
+          ),
+        ],
+      ],
+    );
+  }
+}
 
 /// تبويب الحسابات — الضريبة والخصم والعربون
 class _CalcTab extends StatelessWidget {

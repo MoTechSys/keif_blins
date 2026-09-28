@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../core/brand.dart';
@@ -31,7 +32,11 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
   int _tab = 0;
   final _scaffold = GlobalKey<ScaffoldState>();
 
-  void go(int i) => setState(() => _tab = i);
+  void go(int i) {
+    if (i != _tab) HapticFeedback.selectionClick();
+    setState(() => _tab = i);
+  }
+
   void openMenu() => _scaffold.currentState?.openDrawer();
 
   @override
@@ -150,7 +155,21 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       drawerEdgeDragWidth: 40,
       body: SafeArea(
         bottom: false,
-        child: IndexedStack(index: _tab, children: pages),
+        // تبديل التبويبات بتلاشٍ قصير بدل القطع المباشر، مع حفظ حالة كل تبويب
+        // (Offstage يُبقي الشجرة حيّة كما يفعل IndexedStack، وTickerMode يوقف حركات المخفي)
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            for (var i = 0; i < pages.length; i++)
+              Offstage(
+                offstage: i != _tab,
+                child: TickerMode(
+                  enabled: i == _tab,
+                  child: _FadeInTab(visible: i == _tab, child: pages[i]),
+                ),
+              ),
+          ],
+        ),
       ),
       bottomNavigationBar: _Nav3D(index: _tab, onTap: go),
     );
@@ -260,5 +279,41 @@ class _NavItem extends StatelessWidget {
         ),
       ],
     ),
+  );
+}
+
+/// يُظهر التبويب بتلاشٍ قصير (180ms) كل مرة يصبح فيها مرئيًا، دون إعادة بناء محتواه
+class _FadeInTab extends StatefulWidget {
+  final bool visible;
+  final Widget child;
+  const _FadeInTab({required this.visible, required this.child});
+  @override
+  State<_FadeInTab> createState() => _FadeInTabState();
+}
+
+class _FadeInTabState extends State<_FadeInTab>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 180),
+    value: 1,
+  );
+
+  @override
+  void didUpdateWidget(_FadeInTab old) {
+    super.didUpdateWidget(old);
+    if (widget.visible && !old.visible) _c.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => FadeTransition(
+    opacity: CurvedAnimation(parent: _c, curve: Curves.easeOut),
+    child: widget.child,
   );
 }

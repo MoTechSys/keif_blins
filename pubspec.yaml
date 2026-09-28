@@ -1,7 +1,7 @@
 name: keif_diafa
 description: كيف الضيافة — نظام الفواتير وكشوف الحساب
 publish_to: 'none'
-version: 2.4.0+2400
+version: 2.5.0+2500
 
 environment:
   sdk: ^3.9.0

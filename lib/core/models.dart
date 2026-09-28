@@ -122,8 +122,21 @@ class Client {
 /* ============================================================
    بند
    ============================================================ */
+/// الوحدات الافتراضية للبند (تظهر لأول مرة، ثم يعدّلها المستخدم من الإعدادات — `Org.units`).
 /// «موقع» بطلب العميل: يسعّر الموقع الواحد ويضرب في عدد المواقع (الكمية).
 const unitLabels = ['فترة', 'يوم', 'عدد', 'ساعة', 'شخص', 'وجبة', 'موقع'];
+
+/// تنظيف قائمة وحدات من الإدخال: قص المسافات، حذف الفارغ والمكرر (مع الحفاظ على الترتيب)
+List<String> normalizeUnits(Iterable<String> raw) {
+  final seen = <String>{};
+  final out = <String>[];
+  for (final r in raw) {
+    final u = r.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (u.isEmpty || u.length > 20) continue;
+    if (seen.add(u)) out.add(u);
+  }
+  return out;
+}
 
 class LineItem {
   String id;
@@ -1042,7 +1055,9 @@ class Org {
     this.claimPrefix = 'CLM-',
     this.logoPath = '',
     this.stampPath = '',
-  }) : name = name ?? Brand.current.orgName,
+    List<String>? units,
+  }) : units = units == null ? List.of(unitLabels) : normalizeUnits(units),
+       name = name ?? Brand.current.orgName,
        nameEn = nameEn ?? Brand.current.orgNameEn,
        cr = cr ?? Brand.current.cr,
        city = city ?? Brand.current.city,
@@ -1062,6 +1077,14 @@ class Org {
   /// شعار/ختم مخصّص من الهاتف (مسار داخل مجلد التطبيق الخاص). فارغ = شعار النسخة الافتراضي
   String logoPath;
   String stampPath;
+
+  /// وحدات البنود (قابلة للتعديل من الإعدادات: إضافة/حذف/ترتيب). تُحفظ مع الإعدادات والنسخ الاحتياطي.
+  /// إن أُفرغت كلها يعود التطبيق إلى القائمة الافتراضية حتى لا يبقى البند بلا وحدة.
+  List<String> units;
+
+  /// الوحدات الفعلية المعروضة (لا تعود فارغة أبدًا)
+  List<String> get effectiveUnits =>
+      units.isEmpty ? List.of(unitLabels) : units;
 
   Map<String, dynamic> toMap() => {
     'name': name,
@@ -1103,6 +1126,7 @@ class Org {
     'claimPrefix': claimPrefix,
     'logoPath': logoPath,
     'stampPath': stampPath,
+    'units': units,
   };
 
   factory Org.fromMap(Map? m) {
@@ -1152,6 +1176,10 @@ class Org {
       claimPrefix: (m['claimPrefix'] as String?) ?? 'CLM-',
       logoPath: (m['logoPath'] as String?) ?? '',
       stampPath: (m['stampPath'] as String?) ?? '',
+      // غياب المفتاح (إعدادات قديمة) = الافتراضي؛ قائمة موجودة (حتى فارغة) تُحترم كما هي
+      units: m['units'] is List
+          ? (m['units'] as List).map((e) => '$e').toList()
+          : null,
     );
   }
 

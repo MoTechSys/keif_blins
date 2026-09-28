@@ -2,6 +2,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/models.dart';
 import '../core/money.dart';
@@ -604,6 +605,12 @@ Future<String?> pickDate(BuildContext context, String current) async {
 }
 
 void toast(BuildContext context, String msg, {bool error = false}) {
+  // ملمس لمسي موحّد لكل نتائج الحفظ/الإصدار في التطبيق: خفيف للنجاح، ثقيل للخطأ
+  if (error) {
+    HapticFeedback.heavyImpact();
+  } else {
+    HapticFeedback.lightImpact();
+  }
   ScaffoldMessenger.of(context)
     ..hideCurrentSnackBar()
     ..showSnackBar(
@@ -707,7 +714,91 @@ Future<bool> confirm(
       ],
     ),
   );
+  // اهتزاز متوسط عند تأكيد إجراء خطِر (حذف/مسح) — لا عند الإلغاء
+  if (r == true && danger) HapticFeedback.mediumImpact();
   return r ?? false;
+}
+
+/// نافذة إدخال اسم وحدة (إضافة/تعديل). ترجع الاسم المنظّف أو null عند الإلغاء.
+/// [existing] لرفض التكرار — تُقارن بعد التنظيف؛ [initial] فارغ = إضافة.
+Future<String?> askUnitName(
+  BuildContext context, {
+  String initial = '',
+  Iterable<String> existing = const [],
+}) async {
+  final ctl = TextEditingController(text: initial);
+  final formKey = GlobalKey<FormState>();
+  final others = normalizeUnits(existing.where((e) => e != initial)).toSet();
+  final r = await showDialog<String>(
+    context: context,
+    builder: (ctx) => _DisposeOnRemove(
+      controller: ctl,
+      child: AlertDialog(
+        title: Text(initial.isEmpty ? 'وحدة جديدة' : 'تعديل الوحدة'),
+        content: Form(
+          key: formKey,
+          child: TextFormField(
+            controller: ctl,
+            autofocus: true,
+            maxLength: 20,
+            textInputAction: TextInputAction.done,
+            decoration: const InputDecoration(
+              hintText: 'مثال: موقع، طاولة، ليلة',
+              counterText: '',
+            ),
+            validator: (v) {
+              final u = normalizeUnits([v ?? '']);
+              if (u.isEmpty) return 'اكتب اسم الوحدة';
+              if (others.contains(u.first)) return 'هذه الوحدة موجودة';
+              return null;
+            },
+            onFieldSubmitted: (_) {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(ctx, normalizeUnits([ctl.text]).first);
+              }
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) {
+                Navigator.pop(ctx, normalizeUnits([ctl.text]).first);
+              }
+            },
+            child: Text(initial.isEmpty ? 'إضافة' : 'حفظ'),
+          ),
+        ],
+      ),
+    ),
+  );
+  // المتحكم يُنهى داخل النافذة نفسها عند إزالتها من الشجرة (_DisposeOnRemove) — لا هنا:
+  // فالنافذة تظل تُرسم أثناء حركة الإغلاق بعد عودة showDialog.
+  return r;
+}
+
+/// ينهي [controller] عند إزالة هذا العنصر من الشجرة (نهاية حركة إغلاق الحوار)
+class _DisposeOnRemove extends StatefulWidget {
+  final TextEditingController controller;
+  final Widget child;
+  const _DisposeOnRemove({required this.controller, required this.child});
+  @override
+  State<_DisposeOnRemove> createState() => _DisposeOnRemoveState();
+}
+
+class _DisposeOnRemoveState extends State<_DisposeOnRemove> {
+  @override
+  void dispose() {
+    widget.controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }
 
 /// زر إجراء سريع (شبكة الرئيسية)

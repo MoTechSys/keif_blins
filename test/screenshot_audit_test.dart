@@ -5,7 +5,6 @@
 library;
 
 import 'dart:io';
-import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -51,7 +50,8 @@ Future<void> _loadFonts() async {
   }
   await loader.load();
   final icons = FontLoader('MaterialIcons');
-  final p = '/opt/flutter/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf';
+  final p =
+      '/opt/flutter/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf';
   if (File(p).existsSync()) {
     icons.addFont(
       Future.value(ByteData.view(File(p).readAsBytesSync().buffer)),
@@ -100,7 +100,10 @@ void main() {
             address: 'جدة — حي الروضة',
           );
           await s.saveClient(c);
-          final c2 = Client(name: 'مؤسسة النخبة للمناسبات', phone: '0509876543');
+          final c2 = Client(
+            name: 'مؤسسة النخبة للمناسبات',
+            phone: '0509876543',
+          );
           await s.saveClient(c2);
           inv = Invoice(
             clientId: c.id,
@@ -187,7 +190,9 @@ void main() {
 
       final screens = <String, Widget Function()>{
         'shell': () => const Shell(),
-        'home': () => Scaffold(body: HomeScreen(onNavigate: (_) {}, onMenu: () {})),
+        'home': () => Scaffold(
+          body: HomeScreen(onNavigate: (_) {}, onMenu: () {}),
+        ),
         'docs': () => const DocsScreen(),
         'docForm-edit': () => DocForm(kind: DocKind.invoice, doc: inv),
         'docForm-new': () => const DocForm(kind: DocKind.quotation),

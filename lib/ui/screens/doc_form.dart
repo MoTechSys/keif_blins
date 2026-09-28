@@ -6,6 +6,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/models.dart';
@@ -597,16 +598,41 @@ class _DocFormState extends State<DocForm> {
                 )
               : null,
         ),
-        child: Text(
-          value.isEmpty ? '—' : fmtDate(value),
-          style: const TextStyle(fontWeight: FontWeight.w700),
+        // سطر واحد دائمًا: الأرقام اللاتينية LTR، ويُصغَّر الخط تلقائيًا في الأعمدة الضيقة
+        // (تاريخ المناسبة + إلى تاريخ جنبًا إلى جنب على 360px) بدل الالتفاف على سطرين
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: AlignmentDirectional.centerStart,
+          child: Text(
+            value.isEmpty ? '—' : fmtDate(value),
+            maxLines: 1,
+            textDirection: TextDirection.ltr,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
         ),
       ),
     ),
   );
 
   /* ---------- البند ---------- */
+  /// إضافة وحدة جديدة من داخل النموذج وحفظها في الإعدادات ثم اختيارها للبند
+  Future<void> _addUnit(Store store, _ItemCtl c) async {
+    final name = await askUnitName(context, existing: store.org.effectiveUnits);
+    if (name == null || !mounted) return;
+    final units = normalizeUnits([...store.org.effectiveUnits, name]);
+    if (!units.contains(name)) {
+      // موجودة أصلًا (تطابق بعد التنظيف) — نختارها فقط
+      setState(() => c.unit = normalizeUnits([name]).first);
+      return;
+    }
+    // اختيار فوري في الواجهة، والحفظ في الخلفية (لا انتظار للقرص)
+    HapticFeedback.selectionClick();
+    setState(() => c.unit = name);
+    await store.saveOrg(store.org..units = units);
+  }
+
   Widget _itemCard(int i) {
+    final store = context.read<Store>();
     final c = items[i];
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -693,7 +719,8 @@ class _DocFormState extends State<DocForm> {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  for (final u in {...unitLabels, c.unit})
+                  // وحدات المستخدم (من الإعدادات) + وحدة البند الحالي إن كانت قديمة/محذوفة
+                  for (final u in {...store.org.effectiveUnits, c.unit})
                     ChoiceChip(
                       label: Text(u),
                       selected: c.unit == u,
@@ -705,8 +732,27 @@ class _DocFormState extends State<DocForm> {
                       ),
                       selectedColor: C.gold,
                       showCheckmark: false,
-                      onSelected: (_) => setState(() => c.unit = u),
+                      onSelected: (_) {
+                        HapticFeedback.selectionClick();
+                        setState(() => c.unit = u);
+                      },
                     ),
+                  // إضافة وحدة جديدة مباشرة من هنا — تُحفظ في الإعدادات وتظهر دائمًا
+                  ActionChip(
+                    avatar: Icon(Icons.add, size: 16, color: C.gold),
+                    label: Text(
+                      'وحدة',
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        color: C.gold,
+                      ),
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    side: BorderSide(color: C.gold.withValues(alpha: 0.5)),
+                    tooltip: 'إضافة وحدة جديدة (تُحفظ في الإعدادات)',
+                    onPressed: () => _addUnit(store, c),
+                  ),
                 ],
               ),
             ),

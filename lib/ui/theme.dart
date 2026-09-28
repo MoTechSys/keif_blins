@@ -233,6 +233,18 @@ ThemeData buildTheme([AppTheme t = AppTheme.night]) {
     primaryTextTheme: txt,
     dividerColor: p.line2,
     splashFactory: InkSparkle.splashFactory,
+    // انتقال موحّد لكل الشاشات (يشمل كل MaterialPageRoute في التطبيق بلا تعديلها):
+    // انزلاق خفيف من جهة البداية (يمين في RTL) + تلاشٍ — ناعم وسريع وبلا أيقونات نظام.
+    pageTransitionsTheme: const PageTransitionsTheme(
+      builders: {
+        TargetPlatform.android: _SlideFadeTransitionsBuilder(),
+        TargetPlatform.iOS: _SlideFadeTransitionsBuilder(),
+        TargetPlatform.linux: _SlideFadeTransitionsBuilder(),
+        TargetPlatform.macOS: _SlideFadeTransitionsBuilder(),
+        TargetPlatform.windows: _SlideFadeTransitionsBuilder(),
+        TargetPlatform.fuchsia: _SlideFadeTransitionsBuilder(),
+      },
+    ),
     appBarTheme: AppBarTheme(
       backgroundColor: p.bg,
       foregroundColor: p.text,
@@ -595,4 +607,55 @@ class PlateTones {
     PlateColor.silver => silver,
     PlateColor.red => red,
   };
+}
+
+/* ============================================================
+   انتقال الشاشات: انزلاق 6% من جهة البداية + تلاشٍ (280ms دخول / 220ms خروج)
+   ============================================================ */
+class _SlideFadeTransitionsBuilder extends PageTransitionsBuilder {
+  const _SlideFadeTransitionsBuilder();
+
+  @override
+  Duration get transitionDuration => const Duration(milliseconds: 280);
+
+  @override
+  Duration get reverseTransitionDuration => const Duration(milliseconds: 220);
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final rtl = Directionality.of(context) == TextDirection.rtl;
+    final curved = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    final offset = Tween<Offset>(
+      begin: Offset(rtl ? -0.06 : 0.06, 0),
+      end: Offset.zero,
+    ).animate(curved);
+    // الشاشة السابقة تنزاح قليلًا للخلف وتخفت — إحساس بالعمق دون تشتيت
+    final back =
+        Tween<Offset>(
+          begin: Offset.zero,
+          end: Offset(rtl ? 0.03 : -0.03, 0),
+        ).animate(
+          CurvedAnimation(parent: secondaryAnimation, curve: Curves.easeOut),
+        );
+    return SlideTransition(
+      position: back,
+      child: FadeTransition(
+        opacity: Tween<double>(begin: 1, end: 0.85).animate(secondaryAnimation),
+        child: SlideTransition(
+          position: offset,
+          child: FadeTransition(opacity: curved, child: child),
+        ),
+      ),
+    );
+  }
 }

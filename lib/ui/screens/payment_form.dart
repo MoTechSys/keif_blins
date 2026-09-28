@@ -259,23 +259,22 @@ class _PaymentFormState extends State<PaymentForm> {
             color: C.bg2,
             border: Border(top: BorderSide(color: C.line)),
           ),
-          child: Row(
+          // زرّان أسفل الشاشة: الرئيسي بعرض كامل والثانوي تحته — لا انكسار للنص على 360px
+          // (كان الصفّ يمنح «حفظ فقط» ~40px فينكسر حرفًا حرفًا)
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _save(preview: false),
-                  icon: const Icon(Icons.check_rounded, size: 18),
-                  label: const Text('حفظ فقط'),
-                ),
+              FilledButton.icon(
+                onPressed: () => _save(preview: true),
+                icon: const Icon(Icons.receipt_rounded, size: 18),
+                label: const Text('حفظ وإصدار سند قبض'),
               ),
-              const SizedBox(width: 10),
-              Expanded(
-                flex: 3,
-                child: FilledButton.icon(
-                  onPressed: () => _save(preview: true),
-                  icon: const Icon(Icons.receipt_rounded, size: 18),
-                  label: const Text('حفظ وإصدار سند قبض'),
-                ),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: () => _save(preview: false),
+                icon: const Icon(Icons.check_rounded, size: 18),
+                label: const Text('حفظ فقط (بدون سند)'),
               ),
             ],
           ),

@@ -24,6 +24,7 @@ Invoice _inv({
 );
 
 void main() {
+  _unitsTests();
   test('line item math', () {
     final li = LineItem(unitPrice: 12345, qty: 1.5, external: 100);
     expect(li.service, 18518); // 18517.5 -> 18518
@@ -159,5 +160,48 @@ void main() {
     final o = Org.fromMap(null);
     expect(o.ibanSpaced, 'SA73 1000 0001 4000 1724 4409');
     expect(o.name, 'مؤسسة كيف الضيافة');
+  });
+}
+
+/* ---------- الوحدات المرنة (2.5.0) ---------- */
+void _unitsTests() {
+  test('normalizeUnits: قص، حذف الفارغ والمكرر مع حفظ الترتيب، رفض الطويل', () {
+    expect(
+      normalizeUnits([
+        '  موقع ',
+        'يوم',
+        '',
+        'موقع',
+        '  ',
+        'ليلة  فاخرة',
+        'x' * 21,
+      ]),
+      ['موقع', 'يوم', 'ليلة فاخرة'],
+    );
+  });
+
+  test('Org: الافتراضي = unitLabels، ويُحفظ ويُقرأ، والغياب = افتراضي', () {
+    final o = Org();
+    expect(o.units, unitLabels);
+    expect(o.effectiveUnits, unitLabels);
+    o.units = ['موقع', 'طاولة'];
+    final back = Org.fromMap(o.toMap());
+    expect(back.units, ['موقع', 'طاولة']);
+    // إعدادات قديمة بلا مفتاح units
+    final legacy = Org.fromMap(o.toMap()..remove('units'));
+    expect(legacy.units, unitLabels);
+  });
+
+  test('Org: قائمة فارغة لا تترك البند بلا وحدة', () {
+    final o = Org.fromMap({'units': <String>[]});
+    expect(o.units, isEmpty);
+    expect(o.effectiveUnits, unitLabels);
+  });
+
+  test('Org: القيم غير النصية تُحوَّل ولا تُسقط القراءة', () {
+    final o = Org.fromMap({
+      'units': ['يوم', 5, ' يوم '],
+    });
+    expect(o.units, ['يوم', '5']);
   });
 }
