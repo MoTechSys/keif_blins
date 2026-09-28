@@ -8,7 +8,7 @@
 |---|---|---|---|
 | [`MoTechSys/keif_blins`](https://github.com/MoTechSys/keif_blins) | عام | **الكود المصدري** | مشروع Flutter كامل يبني التطبيقين، الاختبارات، التوثيق الفني، سجل التغييرات |
 | [`MoTechSys/diafa-apps`](https://github.com/MoTechSys/diafa-apps) | **عام (إلزامي)** | **التوزيع + القفل عن بُعد** | ملفات `license.json` (مجلد لكل تطبيق) + صفحة الإصدارات (ملفات APK) |
-| [`MoTechSys/diafa-signing-keys`](https://github.com/MoTechSys/diafa-signing-keys) | **خاص (إلزامي)** | **مفتاح التوقيع** | `release-key.jks` + `key.properties` — بدونه لا يمكن إصدار تحديث |
+| [`MoTechSys/diafa-signing-keys`](https://github.com/MoTechSys/diafa-signing-keys) | **خاص (إلزامي)** | **مفاتيح التوقيع** | `android/` مفتاح كيف/أصول الضيافة · `motech-apps/` مفتاح CarCare/EduAcademy/Kitabi — بدونها لا يمكن إصدار تحديث |
 
 ```
 keif_blins (الكود)  ──بناء──►  APK  ──نشر──►  diafa-apps/releases
@@ -78,6 +78,9 @@ aapt2 dump badging <apk> | head -1
 6. أعد التسمية إلى `keif-aldiafa-vX.Y.Z-arm64.apk` … وانشرها كإصدار `vX.Y.Z` في **diafa-apps** (REST API) مع جدول «أي ملف أُنزّل» وSHA-256.
 7. نزّل الملفات من GitHub وقارن SHA-256 بالأصل.
 8. حدّث `CHANGELOG.md` في keif_blins وفي مجلدي diafa-apps، وادفع.
+
+## حالة العمل الجارية
+- آخر تسليم: `keif_blins/docs/HANDOFF_2.5.0.md` — الكود 2.5.0 جاهز ومختبر، **البناء والنشر متبقيان**.
 
 ## مستخدم المشروع
 
