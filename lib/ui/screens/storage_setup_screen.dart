@@ -59,7 +59,7 @@ class _StorageSetupScreenState extends State<StorageSetupScreen>
       setState(() => _busy = false);
       toast(
         context,
-        'لم تُمنح الصلاحية — سنحفظ الملفات في مجلد Documents بدلًا من ذلك',
+        'لم تُمنح الصلاحية — التطبيق في وضع محدود (Documents). ستُطلب مجددًا عند أول حفظ.',
         error: true,
       );
     }
@@ -174,8 +174,9 @@ class _StorageSetupScreenState extends State<StorageSetupScreen>
                       TextButton(
                         onPressed: _busy ? null : _later,
                         child: Text(
-                          'لاحقًا (الحفظ في مجلد Documents)',
-                          style: TextStyle(color: C.text3),
+                          'لاحقًا — وضع محدود (Documents/${b.folderName})، ويمكن المنح من أي زر حفظ',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: C.text3, fontSize: 12.5),
                         ),
                       ),
                     ],

@@ -16,6 +16,7 @@ import 'screens/docs_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/license_screen.dart';
 import 'screens/lock_screen.dart';
+import 'screens/restore_sheet.dart';
 import 'screens/signin_screen.dart';
 import 'screens/statements_screen.dart';
 import 'screens/storage_setup_screen.dart';
@@ -31,6 +32,18 @@ class Shell extends StatefulWidget {
 class _ShellState extends State<Shell> with WidgetsBindingObserver {
   int _tab = 0;
   final _scaffold = GlobalKey<ScaffoldState>();
+  bool _restoreChecked = false;
+
+  /// بعد إعادة التثبيت: قاعدة فارغة + نسخ سليمة في مجلد التطبيق ⇐ نعرض قائمة الاستعادة
+  /// تلقائيًا مرة واحدة (حتى لا يظن المستخدم أن بياناته ضاعت)
+  Future<void> _offerRestoreOnce() async {
+    if (_restoreChecked) return;
+    _restoreChecked = true;
+    final store = context.read<Store>();
+    if (!await shouldOfferRestore(store)) return;
+    if (!mounted) return;
+    await showRestoreSheet(context, store, auto: true);
+  }
 
   void go(int i) {
     if (i != _tab) HapticFeedback.selectionClick();
@@ -146,6 +159,10 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
           ),
         ),
       );
+    }
+    // الواجهة الرئيسية جاهزة: عرض الاستعادة التلقائية إن لزم (بعد أول إطار)
+    if (!_restoreChecked) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _offerRestoreOnce());
     }
     final pages = [
       HomeScreen(onNavigate: go, onMenu: openMenu),

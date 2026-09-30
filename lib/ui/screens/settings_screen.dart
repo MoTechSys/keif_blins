@@ -22,9 +22,11 @@ import '../../core/models.dart';
 import '../../core/money.dart';
 import '../../core/store.dart';
 import '../drawer.dart';
+import '../storage_guard.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'lock_screen.dart';
+import 'restore_sheet.dart';
 
 /* ============================================================
    مركز الإعدادات (ملاحظة 4/12) — إعدادات حقيقية فقط
@@ -1456,6 +1458,7 @@ class _BackupScreenState extends State<BackupScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(14, 12, 14, 30),
           children: [
+            const LimitedStorageBanner(),
             // ── قاعدة البيانات ──
             GoldCard(
               child: Row(
@@ -1539,30 +1542,35 @@ class _BackupScreenState extends State<BackupScreen> {
                   ),
                   const SizedBox(height: 12),
                   FilledButton.icon(
-                    onPressed: () =>
-                        runBusy(
-                          context,
-                          'جارٍ إنشاء النسخة والتحقق منها…',
-                          () async {
-                            if (!FileService.supported) {
-                              await _shareNow(store);
-                              return;
-                            }
-                            final p = await store.backupNow();
-                            if (p == null) {
-                              throw Exception(
-                                'تعذّر إنشاء نسخة سليمة — تحقّق من مساحة التخزين',
-                              );
-                            }
-                          },
-                        ).then((ok) {
-                          if (!ok || !mounted) return;
-                          toast(
-                            context,
-                            'تم إنشاء النسخة والتحقق منها (SHA-256)',
-                          );
-                          _refresh();
-                        }),
+                    onPressed: () async {
+                      // بلا صلاحية: حوار يشرح + ينقل للإعدادات (ADR-0002)
+                      if (!await StorageGuard.ensure(
+                        context,
+                        what: 'حفظ النسخة الاحتياطية في مجلد التطبيق',
+                      )) {
+                        return;
+                      }
+                      if (!mounted) return;
+                      final ok = await runBusy(
+                        context,
+                        'جارٍ إنشاء النسخة والتحقق منها…',
+                        () async {
+                          if (!FileService.supported) {
+                            await _shareNow(store);
+                            return;
+                          }
+                          final p = await store.backupNow();
+                          if (p == null) {
+                            throw Exception(
+                              'تعذّر إنشاء نسخة سليمة — تحقّق من مساحة التخزين',
+                            );
+                          }
+                        },
+                      );
+                      if (!ok || !mounted) return;
+                      toast(context, 'تم إنشاء النسخة والتحقق منها (SHA-256)');
+                      _refresh();
+                    },
                     icon: const Icon(Icons.backup_rounded),
                     label: const Text('إنشاء نسخة احتياطية الآن'),
                   ),
@@ -1809,23 +1817,19 @@ class _BackupScreenState extends State<BackupScreen> {
               ],
             ],
 
-            // ── الاسترجاع ──
+            // ── الاسترجاع ── (ورقة تعرض كل النسخ فورًا — restore_sheet.dart)
             const SectionTitle('الاسترجاع'),
-            if (latest != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: OutlinedButton.icon(
-                  onPressed: () => _restore(store, latest),
-                  icon: const Icon(Icons.restore_rounded),
-                  label: Text(
-                    'استرجاع آخر نسخة (${_when(latest.file.modified)})',
-                  ),
-                ),
+            FilledButton.tonalIcon(
+              onPressed: () async {
+                await showRestoreSheet(context, store);
+                _refresh();
+              },
+              icon: const Icon(Icons.restore_rounded),
+              label: Text(
+                latest == null
+                    ? 'استعادة نسخة احتياطية'
+                    : 'استعادة… (آخر نسخة ${_when(latest.file.modified)})',
               ),
-            OutlinedButton.icon(
-              onPressed: () => importBackupFromFile(context, store),
-              icon: const Icon(Icons.folder_open_rounded),
-              label: const Text('اختيار ملف نسخة من الجهاز'),
             ),
 
             // ── قائمة نسخ الجهاز ──

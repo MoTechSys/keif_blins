@@ -12,6 +12,7 @@ import 'package:keif_diafa/core/db_factory_io.dart' as dbf;
 import 'package:keif_diafa/core/file_service.dart';
 import 'package:keif_diafa/core/models.dart';
 import 'package:keif_diafa/core/store.dart';
+import 'package:keif_diafa/ui/screens/restore_sheet.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 void main() {
@@ -312,6 +313,80 @@ void main() {
         ),
         isTrue,
       );
+    });
+  });
+
+  group('عرض الاستعادة التلقائي بعد إعادة التثبيت', () {
+    Future<Store> boot() async {
+      SqliteDb.debugDir = '${tmp.path}/db${n++}';
+      Directory(SqliteDb.debugDir!).createSync(recursive: true);
+      final s = Store(db: SqliteDb());
+      await s.init();
+      return s;
+    }
+
+    test('قاعدة فارغة + لا نسخ ⇐ لا عرض', () async {
+      freshBase();
+      final s = await boot();
+      expect(await shouldOfferRestore(s), isFalse);
+      s.dispose();
+    });
+
+    test(
+      'قاعدة فارغة + نسخة سليمة في المجلد ⇐ عرض، ثم لا يتكرر بعد التعليم',
+      () async {
+        freshBase();
+        // تطبيق «قديم» يكتب نسخة
+        final old = await boot();
+        await old.saveClient(Client(name: 'عميل', phone: '05'));
+        expect(await old.backupNow(), isNotNull);
+        old.dispose();
+        // «إعادة تثبيت»: قاعدة جديدة فارغة على نفس المجلد
+        final fresh = await boot();
+        expect(fresh.isEmpty, isTrue);
+        expect(await shouldOfferRestore(fresh), isTrue);
+        await fresh.setKv('restoreOffered', true);
+        expect(await shouldOfferRestore(fresh), isFalse);
+        fresh.dispose();
+      },
+    );
+
+    test('قاعدة فيها بيانات ⇐ لا عرض حتى مع وجود نسخ', () async {
+      freshBase();
+      final s = await boot();
+      await s.saveClient(Client(name: 'عميل', phone: '05'));
+      await s.backupNow();
+      expect(await shouldOfferRestore(s), isFalse);
+      s.dispose();
+    });
+
+    test('نسخة تالفة فقط ⇐ لا عرض', () async {
+      final b = freshBase();
+      final s = await boot();
+      final d = Directory('${b.path}/النسخ الاحتياطية')
+        ..createSync(recursive: true);
+      File(
+        '${d.path}/keif-backup-x.json',
+      ).writeAsStringSync('{"data": {}, "sha256": "bad"}');
+      expect(await shouldOfferRestore(s), isFalse);
+      s.dispose();
+    });
+
+    test('loadBackupEntries: الأحدث أولًا مع التحقق', () async {
+      freshBase();
+      final s = await boot();
+      await s.saveClient(Client(name: 'عميل', phone: '05'));
+      await s.backupNow();
+      await s.backupNow(auto: true);
+      final l = await loadBackupEntries();
+      expect(l.length, 2);
+      expect(l.every((e) => e.check?.ok == true), isTrue);
+      expect(
+        l.first.file.modified.isAfter(l.last.file.modified) ||
+            l.first.file.modified == l.last.file.modified,
+        isTrue,
+      );
+      s.dispose();
     });
   });
 }

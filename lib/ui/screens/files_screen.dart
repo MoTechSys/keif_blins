@@ -8,6 +8,7 @@ import 'package:provider/provider.dart';
 import '../../core/file_service.dart';
 import '../../core/models.dart';
 import '../../core/store.dart';
+import '../storage_guard.dart';
 import '../theme.dart';
 import '../widgets.dart';
 
@@ -100,7 +101,12 @@ class _FilesScreenState extends State<FilesScreen>
                   if (FileService.location != StorageLocation.root)
                     TextButton(
                       onPressed: () async {
-                        final ok = await FileService.requestRootAccess();
+                        // حوار الصلاحية الموحّد (يشرح وينقل للإعدادات ويعيد الفحص عند الرجوع)
+                        final ok = await StorageGuard.ensure(
+                          context,
+                          what: 'نقل مجلد التطبيق إلى الذاكرة الداخلية',
+                          allowLimited: false,
+                        );
                         if (!mounted) return;
                         toast(
                           context,
