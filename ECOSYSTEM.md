@@ -80,7 +80,7 @@ aapt2 dump badging <apk> | head -1
 8. حدّث `CHANGELOG.md` في keif_blins وفي مجلدي diafa-apps، وادفع.
 
 ## حالة العمل الجارية
-- آخر تسليم: `keif_blins/docs/HANDOFF_2.5.0.md` — الكود 2.5.0 جاهز ومختبر، **البناء والنشر متبقيان**.
+- **2.5.0 منشور** (2026-09-30) في [diafa-apps/releases/v2.5.0](https://github.com/MoTechSys/diafa-apps/releases/tag/v2.5.0) — التفاصيل في `keif_blins/docs/HANDOFF_2.5.0.md`. المتبقي: انتظار تفاصيل تعديل «الهيكلية» من المالك.
 
 ## مستخدم المشروع
 
