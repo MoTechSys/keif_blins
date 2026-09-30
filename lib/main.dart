@@ -7,6 +7,7 @@ import 'core/file_service.dart';
 import 'core/license_service.dart';
 import 'core/lock_service.dart';
 import 'core/store.dart';
+import 'core/update_service.dart';
 import 'ui/shell.dart';
 import 'ui/theme.dart';
 
@@ -21,6 +22,8 @@ void main() {
   license.init(); // القفل عن بُعد: آخر حالة محفوظة فورًا ثم تحديث من الشبكة
   // إنشاء مجلد التطبيق وكل مجلدات الأصناف فور التشغيل (على الهاتف)
   if (FileService.supported) FileService.base();
+  // حذف ملفات تحديث منزَّلة سابقًا (بعد التثبيت لا حاجة لها)
+  if (UpdateService.supported) UpdateService.cleanup();
   runApp(KeifApp(store: store, lock: lock, license: license));
 }
 
@@ -42,6 +45,7 @@ class KeifApp extends StatelessWidget {
         ChangeNotifierProvider.value(value: store),
         ChangeNotifierProvider.value(value: lock),
         ChangeNotifierProvider.value(value: license ?? LicenseService()),
+        ChangeNotifierProvider(create: (_) => UpdateService()),
       ],
       child: Consumer<Store>(
         builder: (_, s, __) => MaterialApp(

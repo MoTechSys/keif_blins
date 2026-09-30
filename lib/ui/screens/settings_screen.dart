@@ -21,12 +21,14 @@ import '../../core/hijri.dart';
 import '../../core/models.dart';
 import '../../core/money.dart';
 import '../../core/store.dart';
+import '../../core/update_service.dart';
 import '../drawer.dart';
 import '../storage_guard.dart';
 import '../theme.dart';
 import '../widgets.dart';
 import 'lock_screen.dart';
 import 'restore_sheet.dart';
+import 'update_screen.dart';
 
 /* ============================================================
    مركز الإعدادات (ملاحظة 4/12) — إعدادات حقيقية فقط
@@ -80,6 +82,15 @@ class SettingsHub extends StatelessWidget {
                 : '${store.trashCount} عنصر • تُحذف نهائيًا بعد ${Store.trashDays} يومًا',
             onTap: () => open(const TrashScreen()),
           ),
+          if (UpdateService.supported)
+            DrawerItem(
+              Ic.share,
+              'تحديث التطبيق',
+              context.watch<UpdateService>().last?.available == true
+                  ? 'تحديث جديد متاح — اضغط للتنزيل'
+                  : 'فحص وتنزيل آخر إصدار من GitHub',
+              onTap: () => open(const UpdateScreen()),
+            ),
           DrawerItem(
             Ic.pin,
             'حول التطبيق',

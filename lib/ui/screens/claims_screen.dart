@@ -527,7 +527,12 @@ class _ClaimFormState extends State<ClaimForm> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(_isEdit ? 'خطاب ${c.number}' : 'خطاب مطالبة جديد'),
+          // رقم نمط التاريخ طويل (CLM-20260930-101500) — نصغّره بدل التجاوز
+          title: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: AlignmentDirectional.centerStart,
+            child: Text(_isEdit ? 'خطاب ${c.number}' : 'خطاب مطالبة جديد'),
+          ),
           actions: [
             if (_isEdit)
               IconButton(
@@ -896,23 +901,28 @@ class _ClaimFormState extends State<ClaimForm> {
                   ),
                 ),
                 const SizedBox(width: 8),
+                // Flexible: رقم فاتورة بنمط التاريخ (INV-20260930-101500) طويل — يُقصّ بدل التجاوز
                 if (i.invoiceNumber.isNotEmpty)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: C.blue.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      i.invoiceNumber,
-                      textDirection: TextDirection.ltr,
-                      style: TextStyle(
-                        color: C.blue,
-                        fontSize: 11.5,
-                        fontWeight: FontWeight.w800,
+                  Flexible(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: C.blue.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        i.invoiceNumber,
+                        textDirection: TextDirection.ltr,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: C.blue,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w800,
+                        ),
                       ),
                     ),
                   ),

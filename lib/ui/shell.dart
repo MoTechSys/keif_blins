@@ -17,6 +17,7 @@ import 'screens/home_screen.dart';
 import 'screens/license_screen.dart';
 import 'screens/lock_screen.dart';
 import 'screens/restore_sheet.dart';
+import 'screens/update_screen.dart';
 import 'screens/signin_screen.dart';
 import 'screens/statements_screen.dart';
 import 'screens/storage_setup_screen.dart';
@@ -40,9 +41,13 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
     if (_restoreChecked) return;
     _restoreChecked = true;
     final store = context.read<Store>();
-    if (!await shouldOfferRestore(store)) return;
+    if (await shouldOfferRestore(store)) {
+      if (!mounted) return;
+      await showRestoreSheet(context, store, auto: true);
+    }
+    // ثم فحص التحديث التلقائي (مرة كل 24 ساعة) — لا يزاحم ورقة الاستعادة
     if (!mounted) return;
-    await showRestoreSheet(context, store, auto: true);
+    await autoCheckForUpdate(context);
   }
 
   void go(int i) {

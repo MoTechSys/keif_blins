@@ -80,7 +80,13 @@ class _PaymentFormState extends State<PaymentForm> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isEdit ? 'تعديل الدفعة ${p.receiptNumber}' : 'تسجيل دفعة'),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: AlignmentDirectional.centerStart,
+          child: Text(
+            isEdit ? 'تعديل الدفعة ${p.receiptNumber}' : 'تسجيل دفعة',
+          ),
+        ),
         actions: [
           if (isEdit)
             IconButton(

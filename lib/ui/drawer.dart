@@ -4,6 +4,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../core/brand.dart';
 import '../core/file_service.dart';
@@ -138,13 +139,8 @@ class AppDrawer extends StatelessWidget {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Text(
-                '${Brand.current.appName} v${SettingsHub.version}',
-                style: TextStyle(color: C.text3, fontSize: 11),
-              ),
-            ),
+            // التذييل: الإصدار + توقيع المطوّر (يفتح واتساب) — قرار المالك 2.6.0
+            const DeveloperFooter(),
           ],
         ),
       ),
@@ -220,6 +216,69 @@ class DrawerItem extends StatelessWidget {
           ),
         ),
       ),
+    ),
+  );
+}
+
+/// توقيع المطوّر في أسفل القائمة الجانبية: «تطوير م. معين العباسي» ← واتساب +967 770 941 666
+class DeveloperFooter extends StatelessWidget {
+  static const name = 'م. معين العباسي';
+  static const phoneE164 = '967770941666';
+  static const phoneDisplay = '+967 770 941 666';
+  static Uri get whatsapp => Uri.parse('https://wa.me/$phoneE164');
+
+  const DeveloperFooter({super.key});
+
+  Future<void> _open() async {
+    try {
+      await launchUrl(whatsapp, mode: LaunchMode.externalApplication);
+    } catch (_) {}
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          '${Brand.current.appName} v${SettingsHub.version}',
+          style: TextStyle(color: C.text3, fontSize: 11),
+        ),
+        const SizedBox(height: 4),
+        Material(
+          color: Colors.transparent,
+          child: InkWell(
+            borderRadius: BorderRadius.circular(10),
+            onTap: _open,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              // Wrap لا Row: يلتف على سطرين في الشاشات الضيقة (320dp) بدل التجاوز
+              child: Wrap(
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 6,
+                children: [
+                  Icon(Icons.chat_rounded, color: C.green, size: 16),
+                  Text(
+                    'تطوير $name',
+                    style: TextStyle(
+                      color: C.text2,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    phoneDisplay,
+                    textDirection: TextDirection.ltr,
+                    style: TextStyle(color: C.goldInk, fontSize: 11.5),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     ),
   );
 }
