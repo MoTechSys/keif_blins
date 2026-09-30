@@ -969,6 +969,9 @@ class Claim {
 }
 
 class Org {
+  /// نمط الترقيم الافتراضي للتثبيتات الجديدة (قرار المالك 2.6.0 — ADR-0003)
+  static const defaultNumberingMode = 'datetime';
+
   String name;
   String nameEn;
   String cr;
@@ -1006,8 +1009,11 @@ class Org {
   String quoteTerms;
 
   /* ---- الترقيم (ملاحظة 11ج) ----
+     'datetime' : تلقائي من التاريخ والوقت  (INV-20260509-143522)  ← الافتراضي منذ 2.6.0
      'seq'      : تسلسلي  بادئة + رقم يبدأ من invStart  (INV-0001)
-     'datetime' : تلقائي من التاريخ والوقت             (INV-20260509-143522)  */
+     يشمل الفواتير وعروض الأسعار والمطالبات وسندات القبض.
+     الإعدادات المحفوظة قبل 2.6.0 بلا مفتاح تحمل 'seq' (كانت الافتراضي حينها) —
+     انظر Org.fromMap؛ لذلك لا يتغيّر نمط أي مستخدم حالي دون علمه. */
   String numberingMode;
 
   /// إدراج السنة في الرقم التسلسلي: INV-2026-0001
@@ -1054,7 +1060,7 @@ class Org {
     String? invoiceTerms,
     this.quoteTerms =
         'هذا العرض ساري لمدة 15 يومًا من تاريخه. الأسعار شاملة الخدمة والتجهيز. يُعتمد العرض بتأكيد العميل ودفع العربون، وتُصدر الفاتورة النهائية بعد التنفيذ.',
-    this.numberingMode = 'seq',
+    this.numberingMode = defaultNumberingMode,
     this.numberYear = false,
     this.showBank = true,
     this.showVatNumber = false,
@@ -1175,7 +1181,10 @@ class Org {
       quotePrefix: (m['quotePrefix'] ?? d.quotePrefix) as String,
       invoiceTerms: (m['invoiceTerms'] ?? d.invoiceTerms) as String,
       quoteTerms: (m['quoteTerms'] ?? d.quoteTerms) as String,
-      numberingMode: (m['numberingMode'] as String?) ?? 'seq',
+      // إعدادات محفوظة بلا المفتاح = مؤسسة قديمة كانت على التسلسلي؛ خريطة فارغة = تثبيت جديد
+      numberingMode:
+          (m['numberingMode'] as String?) ??
+          (m.isEmpty ? defaultNumberingMode : 'seq'),
       numberYear: (m['numberYear'] as bool?) ?? false,
       showBank: (m['showBank'] as bool?) ?? true,
       showVatNumber:

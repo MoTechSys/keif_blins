@@ -714,9 +714,25 @@ class _NumberingTabState extends State<_NumberingTab> {
           padding: EdgeInsets.zero,
           child: RadioGroup<String>(
             groupValue: o.numberingMode,
-            onChanged: (v) => setState(() => o.numberingMode = v ?? 'seq'),
+            onChanged: (v) =>
+                setState(() => o.numberingMode = v ?? Org.defaultNumberingMode),
             child: Column(
               children: [
+                RadioListTile<String>(
+                  value: 'datetime',
+                  title: Text(
+                    'تلقائي من التاريخ والوقت (الافتراضي)',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: C.text,
+                    ),
+                  ),
+                  subtitle: Text(
+                    'بادئة + التاريخ والوقت عند الإنشاء (INV-20260509-143522) — فريد دائمًا ولا يحتاج ضبطًا. يشمل الفواتير والعروض والمطالبات وسندات القبض.',
+                    style: TextStyle(color: C.text3, fontSize: 12),
+                  ),
+                ),
+                const Divider(height: 1),
                 RadioListTile<String>(
                   value: 'seq',
                   title: Text(
@@ -752,21 +768,6 @@ class _NumberingTabState extends State<_NumberingTab> {
                       onChanged: (v) => setState(() => o.numberYear = v),
                     ),
                   ),
-                const Divider(height: 1),
-                RadioListTile<String>(
-                  value: 'datetime',
-                  title: Text(
-                    'تلقائي من التاريخ والوقت',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: C.text,
-                    ),
-                  ),
-                  subtitle: Text(
-                    'بادئة + التاريخ والوقت عند الإنشاء (INV-20260509-143522)',
-                    style: TextStyle(color: C.text3, fontSize: 12),
-                  ),
-                ),
               ],
             ),
           ),
@@ -1582,21 +1583,42 @@ class _BackupScreenState extends State<BackupScreen> {
             if (FileService.supported)
               GoldCard(
                 padding: EdgeInsets.zero,
-                child: SwitchListTile(
-                  secondary: const Icon(Icons.event_repeat_rounded),
-                  title: Text(
-                    'نسخة يومية تلقائية على الجهاز',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w800,
-                      color: C.text,
+                child: Column(
+                  children: [
+                    SwitchListTile(
+                      secondary: const Icon(Icons.event_repeat_rounded),
+                      title: Text(
+                        'نسخة تلقائية كل 24 ساعة',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: C.text,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'عند فتح التطبيق إن مرّ يوم على آخر نسخة • ملف واحد لكل يوم • يُحتفظ بآخر ${BackupService.keepDaily} يومًا • كل نسخة يُتحقق منها بعد كتابتها',
+                        style: TextStyle(color: C.text3, fontSize: 12),
+                      ),
+                      value: store.autoBackupEnabled,
+                      onChanged: store.setAutoBackup,
                     ),
-                  ),
-                  subtitle: Text(
-                    'عند أول فتح كل يوم وبعد كل تعديل • يُحتفظ بآخر ${BackupService.keepDaily} يومًا • كل نسخة يُتحقق منها بعد كتابتها',
-                    style: TextStyle(color: C.text3, fontSize: 12),
-                  ),
-                  value: store.autoBackupEnabled,
-                  onChanged: store.setAutoBackup,
+                    const Divider(height: 1),
+                    SwitchListTile(
+                      secondary: const Icon(Icons.exit_to_app_rounded),
+                      title: Text(
+                        'نسخة عند الخروج من التطبيق',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: C.text,
+                        ),
+                      ),
+                      subtitle: Text(
+                        'عند إغلاق التطبيق أو تركه للخلفية بعد أي تعديل تُحدَّث نسخة اليوم فورًا (لا تتكاثر الملفات). مطفأة افتراضيًا.',
+                        style: TextStyle(color: C.text3, fontSize: 12),
+                      ),
+                      value: store.backupOnExitEnabled,
+                      onChanged: store.setBackupOnExit,
+                    ),
+                  ],
                 ),
               ),
 

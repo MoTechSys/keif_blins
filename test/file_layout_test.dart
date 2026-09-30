@@ -5,6 +5,7 @@ import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hive/hive.dart';
+import 'package:keif_diafa/core/backup_service.dart';
 import 'package:keif_diafa/core/brand.dart';
 import 'package:keif_diafa/core/db.dart';
 import 'package:keif_diafa/core/db_factory_io.dart' as dbf;
@@ -218,7 +219,7 @@ void main() {
     });
   });
 
-  group('النسخة الاحتياطية عند الخروج', () {
+  group('النسخة الاحتياطية عند الخروج (اختيارية — ADR-0004)', () {
     Future<Store> boot() async {
       SqliteDb.debugDir = '${tmp.path}/db${n++}';
       Directory(SqliteDb.debugDir!).createSync(recursive: true);
@@ -227,13 +228,21 @@ void main() {
       return s;
     }
 
-    test('تعديل ثم خروج فوري ⇐ نسخة اليوم تُكتب بلا انتظار المؤقّت', () async {
+    test('الافتراضي: مطفأة ⇐ تعديل ثم خروج لا يكتب شيئًا', () async {
+      freshBase();
+      final s = await boot();
+      expect(s.backupOnExitEnabled, isFalse);
+      await s.saveClient(Client(name: 'عميل', phone: '05'));
+      expect(s.backupDirty, isTrue, reason: 'التعديل يُعلَّم دائمًا');
+      expect(await s.flushBackupOnExit(), isNull);
+      s.dispose();
+    });
+
+    test('مفعّلة: تعديل ثم خروج ⇐ نسخة اليوم تُكتب فورًا ومرة واحدة', () async {
       final b = freshBase();
       final s = await boot();
-      expect(s.backupDirty, isFalse);
+      await s.setBackupOnExit(true);
       await s.saveClient(Client(name: 'عميل', phone: '05'));
-      expect(s.backupDirty, isTrue, reason: 'تعديل معلّق');
-      // لم تمر 4 ثوانٍ — نحاكي الخروج
       final p = await s.flushBackupOnExit();
       expect(p, isNotNull);
       expect(File(p!).existsSync(), isTrue);
@@ -241,26 +250,68 @@ void main() {
       expect(s.backupDirty, isFalse);
       // خروج ثانٍ بلا تعديل ⇐ لا كتابة
       expect(await s.flushBackupOnExit(), isNull);
+      // 50 خروجًا مع تعديلات ⇐ ملف اليوم نفسه يُستبدل، لا تكاثر
+      for (var i = 0; i < 50; i++) {
+        await s.saveClient(Client(name: 'عميل $i', phone: '05'));
+        await s.flushBackupOnExit();
+      }
+      final files = await FileService.list(FileKind.backup);
+      expect(files.length, 1, reason: 'نسخة تلقائية واحدة لليوم');
       s.dispose();
     });
 
-    test('النسخ التلقائي مُعطّل ⇐ لا كتابة عند الخروج', () async {
+    test('الإعداد يُحفظ ويُقرأ بعد إعادة التشغيل (kvKeys)', () async {
       freshBase();
-      final s = await boot();
-      await s.setAutoBackup(false);
-      await s.saveClient(Client(name: 'عميل', phone: '05'));
-      expect(await s.flushBackupOnExit(), isNull);
+      final dir = '${tmp.path}/db${n++}';
+      Directory(dir).createSync(recursive: true);
+      SqliteDb.debugDir = dir;
+      var s = Store(db: SqliteDb());
+      await s.init();
+      await s.setBackupOnExit(true);
+      s.dispose();
+      SqliteDb.debugDir = dir;
+      s = Store(db: SqliteDb());
+      await s.init();
+      expect(s.backupOnExitEnabled, isTrue);
       s.dispose();
     });
 
     test('الملف المكتوب يمر من BackupService.verify (بصمة سليمة)', () async {
       freshBase();
       final s = await boot();
+      await s.setBackupOnExit(true);
       await s.saveClient(Client(name: 'عميل', phone: '05'));
       final p = await s.flushBackupOnExit();
       final chk = await FileService.readText(p!);
       expect(chk, contains('"sha256"'));
       s.dispose();
+    });
+  });
+
+  group('النسخة اليومية كل 24 ساعة', () {
+    test('isDailyDue', () {
+      final now = DateTime(2026, 9, 30, 10);
+      expect(BackupService.isDailyDue(null, now: now), isTrue);
+      expect(BackupService.isDailyDue('', now: now), isTrue);
+      // قيمة قديمة yyyy-mm-dd (≤ 2.5.0) تُفهم كمنتصف ليل ذلك اليوم
+      expect(BackupService.isDailyDue('2026-09-28', now: now), isTrue);
+      expect(BackupService.isDailyDue('2026-09-30', now: now), isFalse);
+      expect(
+        BackupService.isDailyDue(
+          now
+              .subtract(const Duration(hours: 23, minutes: 59))
+              .toIso8601String(),
+          now: now,
+        ),
+        isFalse,
+      );
+      expect(
+        BackupService.isDailyDue(
+          now.subtract(const Duration(hours: 24)).toIso8601String(),
+          now: now,
+        ),
+        isTrue,
+      );
     });
   });
 }

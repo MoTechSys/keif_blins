@@ -5,8 +5,9 @@
 ///  2. **كتابة ذرّية**: ملف مؤقت → flush → إعادة تسمية؛ انقطاع مفاجئ لا يترك نسخة نصف مكتوبة.
 ///  3. **قراءة تحققية** بعد الكتابة: يُعاد فتح الملف ويُعاد حساب البصمة ومقارنة الأعداد.
 ///     إن لم تتطابق يُحذف الملف وتُعاد المحاولة مرة، ثم يُبلَّغ بالفشل (لا نسخة «ناجحة» مزيّفة).
-///  4. **نسخة يومية** تلقائية: عند أول فتح في اليوم + بعد كل تعديل (يُستبدل ملف اليوم نفسه).
-///     يُحتفظ بآخر [keepDaily] يومًا، والنسخ اليدوية لا تُحذف تلقائيًا أبدًا.
+///  4. **نسخة يومية** تلقائية: مرة كل 24 ساعة عند فتح التطبيق (ملف اليوم يُستبدل في نفس اليوم
+///     فلا تتكاثر النسخ). يُحتفظ بآخر [keepDaily] يومًا، والنسخ اليدوية لا تُحذف تلقائيًا أبدًا.
+///     نسخة «عند الخروج» اختيارية (Store.backupOnExitEnabled) — انظر ADR-0004.
 ///  5. نسخة Google Drive (إن فُعّلت) تُرفع مرة يوميًا ويُقارن md5 المرفوع بالمحلي.
 library;
 
@@ -147,7 +148,7 @@ class BackupService {
         if (chk.ok && chk.hasHash && back.length == text.length) {
           await s.setKv('lastBackupHash', jsonDecode(back)['sha256']);
           if (auto) {
-            await s.setKv('lastDailyBackup', todayISO());
+            await s.setKv('lastDailyBackup', DateTime.now().toIso8601String());
             await FileService.pruneBackups(keep: keepDaily);
           }
           return path;
@@ -163,11 +164,21 @@ class BackupService {
     return null;
   }
 
-  /// النسخة اليومية: تُكتب مرة عند أول فتح في اليوم، ثم تُرفع إلى Drive إن كان مفعّلًا
+  /// فاصل النسخة التلقائية
+  static const dailyEvery = Duration(hours: 24);
+
+  /// هل مرّت 24 ساعة على آخر نسخة تلقائية؟ (يفهم القيمة القديمة yyyy-mm-dd أيضًا)
+  static bool isDailyDue(Object? lastDaily, {DateTime? now}) {
+    final t = DateTime.tryParse('${lastDaily ?? ''}');
+    if (t == null) return true;
+    return (now ?? DateTime.now()).difference(t) >= dailyEvery;
+  }
+
+  /// النسخة اليومية: مرة كل 24 ساعة عند الفتح، ثم تُرفع إلى Drive إن كان مفعّلًا
   static Future<void> dailyIfDue(Store s) async {
     try {
       if (!FileService.supported || s.isEmpty) return;
-      if (s.autoBackupEnabled && s.kv('lastDailyBackup') != todayISO()) {
+      if (s.autoBackupEnabled && isDailyDue(s.kv('lastDailyBackup'))) {
         await s.backupNow(auto: true);
       }
       await DriveService.dailyIfDue(s);

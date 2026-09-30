@@ -61,6 +61,8 @@ void main() {
     expect(s.clients.any((c) => c.name == 'عميل صالح'), isTrue);
     expect(s.docs.any((d) => d.number == 'INV-0007'), isTrue);
     expect(s.org.name, 'مؤسسة الاختبار');
+    // نسخة قديمة بلا numberingMode ⇐ تبقى تسلسلية (ADR-0003)
+    expect(s.org.numberingMode, 'seq');
     s.docs.add(Invoice(clientId: 'c1', number: 'INV-99999999999999999999999'));
     expect(() => s.nextNumber(DocKind.invoice), returnsNormally);
     expect(s.nextNumber(DocKind.invoice), endsWith('0008'));
@@ -250,4 +252,26 @@ void main() {
     expect(cl.total, 550000);
     expect(cl.recipient, 'مستشفى');
   });
+
+  test(
+    'كل مفتاح يُكتب بـ setKv مسجّل في Store.kvKeys (وإلا لا يُقرأ بعد إعادة التشغيل)',
+    () {
+      // نجمع كل setKv('x' / kv('x') في lib/ ونتحقق أن x في السجل
+      final used = <String>{};
+      final re = RegExp(r"""(?:setKv|kv)\(\s*'([A-Za-z_]+)'""");
+      for (final f in Directory('lib').listSync(recursive: true)) {
+        if (f is! File || !f.path.endsWith('.dart')) continue;
+        for (final m in re.allMatches(f.readAsStringSync())) {
+          used.add(m[1]!);
+        }
+      }
+      expect(used, isNotEmpty);
+      final missing = used.where((k) => !Store.kvKeys.contains(k)).toList();
+      expect(
+        missing,
+        isEmpty,
+        reason: 'أضف المفاتيح إلى Store.kvKeys: $missing',
+      );
+    },
+  );
 }

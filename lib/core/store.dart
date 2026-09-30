@@ -163,9 +163,13 @@ class Store extends ChangeNotifier {
     }
   }
 
-  static const _kvKeys = [
+  /// كل مفتاح يُكتب بـ setKv **يجب** أن يكون هنا وإلا لا يُقرأ عند التشغيل التالي
+  /// (درس 2.6.0: pdfFoldersByClient كان يُكتب ولا يُقرأ ⇒ الترحيل يعمل كل فتح).
+  /// اختبار store_test «كل مفتاح مستخدم مسجّل» يحرس هذا.
+  static const kvKeys = [
     'org',
     'autoBackup',
+    'backupOnExit',
     'signedIn',
     'accountName',
     'accountEmail',
@@ -175,7 +179,13 @@ class Store extends ChangeNotifier {
     'driveAuto',
     'lastBackupHash',
     'storageAsked',
+    'onboardingDone',
+    'pdfFoldersByClient',
+    'restoreOffered',
+    'updateSkippedCode',
+    'lastUpdateCheck',
   ];
+  static const _kvKeys = kvKeys;
 
   dynamic kv(String key) => _kv[key];
   Future<void> setKv(String key, dynamic value) async {
@@ -241,40 +251,39 @@ class Store extends ChangeNotifier {
   }
 
   /* ---------- النسخ الاحتياطي التلقائي إلى مجلد الهاتف ---------- */
-  Timer? _backupTimer;
 
   /// آخر نسخة ناجحة (مسار الملف) — للعرض في الإعدادات
   String? lastAutoBackupPath;
   DateTime? lastAutoBackupAt;
 
+  /// سياسة النسخ (ADR-0004):
+  ///  • يومية تلقائية [autoBackup] (افتراضيًا مفعّلة): مرة كل 24 ساعة عند فتح التطبيق
+  ///    (ملف <بادئة>-auto-<اليوم>.json يُستبدل في نفس اليوم، ويُحتفظ بآخر 30).
+  ///  • عند الخروج [backupOnExit] (افتراضيًا **مطفأة** — يفعّلها المستخدم إن أراد):
+  ///    عند الذهاب للخلفية/الإغلاق ووجود تعديل معلّق تُحدّث نسخة اليوم فورًا.
+  ///  • يدوية: زر «إنشاء نسخة الآن» — ملف مستقل بالوقت، لا يُحذف تلقائيًا أبدًا.
+  ///  • لا نسخة بعد كل تعديل (كانت حتى 2.5.0 بمؤقّت 4 ثوانٍ) — قاعدة البيانات نفسها
+  ///    تُكتب فورًا عند كل حفظ (SQLite WAL) فلا حاجة لذلك.
   bool get autoBackupEnabled => (_kv['autoBackup'] as bool?) ?? true;
-  Future<void> setAutoBackup(bool v) async {
-    await setKv('autoBackup', v);
-    if (v) _scheduleAutoBackup();
-  }
+  Future<void> setAutoBackup(bool v) => setKv('autoBackup', v);
+
+  bool get backupOnExitEnabled => (_kv['backupOnExit'] as bool?) ?? false;
+  Future<void> setBackupOnExit(bool v) => setKv('backupOnExit', v);
 
   /// هل هناك تعديل لم تُكتب له نسخة احتياطية بعد؟ (يُصفَّر عند نجاح النسخة)
   bool backupDirty = false;
 
-  /// بعد أي تغيير: ننتظر 4 ثوانٍ (لتجميع التعديلات المتتالية) ثم نحدّث نسخة اليوم
+  /// بعد أي تغيير: نعلّم فقط أن هناك تعديلًا معلّقًا (لا كتابة فورية)
   void _scheduleAutoBackup() {
     if (!FileService.supported) return;
     backupDirty = true;
-    if (!autoBackupEnabled) return;
-    _backupTimer?.cancel();
-    _backupTimer = Timer(
-      const Duration(seconds: 4),
-      () => backupNow(auto: true),
-    );
   }
 
-  /// عند خروج التطبيق إلى الخلفية/إغلاقه: لا ننتظر المؤقّت — نكتب نسخة اليوم فورًا
-  /// إن كان هناك تعديل معلّق. (أندرويد قد يقتل العملية في أي لحظة بعد paused،
-  /// لذلك هذه آخر فرصة مضمونة للكتابة.) تعيد المسار أو null إن لم يلزم/فشل.
+  /// عند خروج التطبيق إلى الخلفية/إغلاقه — فقط إن فعّل المستخدم «نسخة عند الخروج»
+  /// وكان هناك تعديل معلّق. تعيد المسار أو null إن لم يلزم/فشل.
   Future<String?> flushBackupOnExit() async {
-    if (!FileService.supported || !autoBackupEnabled) return null;
+    if (!FileService.supported || !backupOnExitEnabled) return null;
     if (!backupDirty) return null;
-    _backupTimer?.cancel();
     return backupNow(auto: true);
   }
 
@@ -301,12 +310,6 @@ class Store extends ChangeNotifier {
     final n = t ?? DateTime.now();
     String two(int v) => v.toString().padLeft(2, '0');
     return '${n.year}-${two(n.month)}-${two(n.day)}_${two(n.hour)}-${two(n.minute)}';
-  }
-
-  @override
-  void dispose() {
-    _backupTimer?.cancel();
-    super.dispose();
   }
 
   /* ---------- الاستعلامات ---------- */
@@ -415,28 +418,43 @@ class Store extends ChangeNotifier {
   /// يشمل المحذوفات حتى لا يتكرر رقم مستند في السلة
   Iterable<Invoice> get _allDocs => [...docs, ...trashDocs];
 
+  /// رقم بنمط «التاريخ والوقت»: <بادئة>YYYYMMDD-HHMMSS — فريد بطبيعته؛
+  /// إن تكرّر في نفس الثانية (إنشاء سريع متتالي) تُضاف لاحقة -1 -2 …
+  /// [taken] يجيب: هل هذا الرقم مستخدم؟ (يشمل سلة المحذوفات)
+  static String datetimeNumber(
+    String prefix,
+    bool Function(String) taken, {
+    DateTime? at,
+  }) {
+    final now = at ?? DateTime.now();
+    String two(int v) => v.toString().padLeft(2, '0');
+    final base =
+        '$prefix${now.year}${two(now.month)}${two(now.day)}-${two(now.hour)}${two(now.minute)}${two(now.second)}';
+    var n = base;
+    var k = 1;
+    while (taken(n)) {
+      n = '$base-${k++}';
+    }
+    return n;
+  }
+
+  bool get _datetimeNumbering => org.numberingMode == 'datetime';
+
   String nextNumber(DocKind kind) {
     final prefix = kind == DocKind.invoice ? org.invPrefix : org.quotePrefix;
-    final now = DateTime.now();
-    String two(int v) => v.toString().padLeft(2, '0');
-    if (org.numberingMode == 'datetime') {
-      // INV-20260509-143522 — فريد بطبيعته؛ نضيف لاحقة إن تكرّر في نفس الثانية
-      final base =
-          '$prefix${now.year}${two(now.month)}${two(now.day)}-${two(now.hour)}${two(now.minute)}${two(now.second)}';
-      var n = base;
-      var k = 1;
-      while (_allDocs.any((d) => d.number == n)) {
-        n = '$base-${k++}';
-      }
-      return n;
+    if (_datetimeNumbering) {
+      return datetimeNumber(prefix, (n) => _allDocs.any((d) => d.number == n));
     }
     // تسلسلي: بادئة [+ سنة-] + رقم يبدأ من "يبدأ من"
+    final now = DateTime.now();
     final yearPart = org.numberYear ? '${now.year}-' : '';
     var max = org.invStart - 1;
     for (final d in _allDocs.where((d) => d.kind == kind)) {
       if (org.numberYear && !d.number.startsWith('$prefix$yearPart')) {
         continue; // التسلسل يبدأ من جديد كل سنة
       }
+      // أرقام نمط التاريخ (INV-20260930-101500) لا تدخل في التسلسل
+      if (RegExp(r'\d{8}-\d{6}').hasMatch(d.number)) continue;
       final m = RegExp(r'(\d+)\s*$').firstMatch(d.number);
       final n = m == null ? null : int.tryParse(m[1]!);
       if (n != null && n > max) max = n;
@@ -455,14 +473,24 @@ class Store extends ChangeNotifier {
     }
   }
 
+  /// رقم سند القبض — يتبع نمط الترقيم نفسه (REC-20260930-101500 أو REC-0001)
+  static const receiptPrefix = 'REC-';
   String nextReceiptNumber() {
+    final all = [...payments, ...trashPayments];
+    if (_datetimeNumbering) {
+      return datetimeNumber(
+        receiptPrefix,
+        (n) => all.any((p) => p.receiptNumber == n),
+      );
+    }
     var max = 0;
-    for (final p in [...payments, ...trashPayments]) {
-      final m = RegExp(r'REC-(\d+)').firstMatch(p.receiptNumber);
+    for (final p in all) {
+      // نتجاوز أرقام نمط التاريخ (REC-20260930-…) حتى لا يقفز التسلسل إلى الملايين
+      final m = RegExp(r'^REC-(\d{1,6})$').firstMatch(p.receiptNumber);
       final n = m == null ? null : int.tryParse(m[1]!);
       if (n != null && n > max) max = n;
     }
-    return 'REC-${(max + 1).toString().padLeft(4, '0')}';
+    return '$receiptPrefix${(max + 1).toString().padLeft(4, '0')}';
   }
 
   /// رقم الكشف: SOA-سنةشهر-رمز ثابت للعميل
@@ -621,21 +649,14 @@ class Store extends ChangeNotifier {
   String nextClaimNumber() {
     final prefix = org.claimPrefix.isEmpty ? 'CLM-' : org.claimPrefix;
     final all = [...claims, ...trashClaims];
-    final now = DateTime.now();
-    String two(int v) => v.toString().padLeft(2, '0');
-    if (org.numberingMode == 'datetime') {
-      final base =
-          '$prefix${now.year}${two(now.month)}${two(now.day)}-${two(now.hour)}${two(now.minute)}${two(now.second)}';
-      var n = base;
-      var k = 1;
-      while (all.any((c) => c.number == n)) {
-        n = '$base-${k++}';
-      }
-      return n;
+    if (_datetimeNumbering) {
+      return datetimeNumber(prefix, (n) => all.any((c) => c.number == n));
     }
     var max = 0;
     for (final c in all) {
       if (!c.number.startsWith(prefix)) continue;
+      // أرقام نمط التاريخ (CLM-20260930-…) لا تدخل في التسلسل
+      if (RegExp(r'\d{8}-\d{6}').hasMatch(c.number)) continue;
       final m = RegExp(r'(\d+)\s*$').firstMatch(c.number);
       final n = m == null ? null : int.tryParse(m[1]!);
       if (n != null && n > max) max = n;
@@ -977,7 +998,10 @@ class Store extends ChangeNotifier {
     claims.removeWhere((c) => c.isDeleted);
     if (data['org'] is Map) {
       try {
-        org = Org.fromMap({...org.toMap(), ...(data['org'] as Map)});
+        final o = Map<String, dynamic>.from(data['org'] as Map);
+        // نسخة من إصدار ≤ 2.5.0 (بلا مفتاح الترقيم) كانت تسلسلية ضمنيًا — نحافظ على ذلك
+        o.putIfAbsent('numberingMode', () => 'seq');
+        org = Org.fromMap({...org.toMap(), ...o});
       } catch (e) {
         debugPrint('import: org skipped: $e');
       }
@@ -989,7 +1013,6 @@ class Store extends ChangeNotifier {
   /// مسح البيانات (العملاء/المستندات/الدفعات/الإعدادات).
   /// رمز القفل محفوظ في صندوق منفصل فلا يتأثر. النسخ الاحتياطية في مجلد الهاتف تبقى كذلك.
   Future<void> wipe() async {
-    _backupTimer?.cancel();
     clients.clear();
     docs.clear();
     payments.clear();

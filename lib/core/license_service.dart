@@ -96,7 +96,11 @@ class LicenseService extends ChangeNotifier {
       // الويب داخل iframe مقيّد: localStorage يرمي SecurityError. لا نقفل التطبيق
       // بسبب تعذّر التخزين — نعرض الحالة الافتراضية (مسموح) ونكمل.
       debugPrint('LicenseService.init: prefs unavailable ($e)');
-      _state = const LicenseState(allowed: true, message: '', codeAccepted: false);
+      _state = const LicenseState(
+        allowed: true,
+        message: '',
+        codeAccepted: false,
+      );
     }
     notifyListeners();
     await refresh();
