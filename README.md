@@ -9,15 +9,15 @@
 
 | | |
 |---|---|
-| الإصدار الحالي | **2.6.0+2500** (منشور 2026-09-30) — [التحميل من diafa-apps](https://github.com/MoTechSys/diafa-apps/releases/latest) (إصدارات ≤2.2.0 هنا قديمة وبمفتاح مختلف) |
+| الإصدار الحالي | **2.6.0+2600** (منشور 2026-09-30، بناء 3600/4600) — [التحميل من diafa-apps](https://github.com/MoTechSys/diafa-apps/releases/latest) (إصدارات ≤2.2.0 هنا قديمة وبمفتاح مختلف) |
 | الحزمتان | `com.hospitalitybilling.keif_diafa` (flavor `keif`) · `com.hospitalitybilling.osool_diafa` (flavor `osool`) — اسم مشروع Dart `keif_diafa` |
 | المنصة | **أندرويد فقط** (arm64 + armv7). الويب للمعاينة فقط |
 | البيئة (مثبّتة، لا تُحدَّث) | Flutter **3.35.4** · Dart **3.9.2** · Android SDK 35 · JDK 17 |
-| اللغة مع المستخدم | **العربية دائمًا** (المستخدم: «ياغالي») |
+| اللغة مع المستخدم | **العربية دائمًا** (المالك: **بروفيسور** — م. معين العباسي) |
 
-> **لوكيل جديد:** اقرأ `ECOSYSTEM.md` ثم هذا الملف ثم `docs/AGENT_GUIDE.md` (طريقة العمل ومعايير الدقة) ثم `CHANGELOG.md` (كل قرار وسببه). لا تبدأ أي تعديل قبل ذلك.
+> 🚀 **لوكيل جديد: ابدأ من [`docs/START_HERE.md`](docs/START_HERE.md)** — يرتّب لك القراءة (15 دقيقة) ويعطيك أوامر التحقق وخريطة الكود. ثم [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) (كيف يعمل كل شيء) و[`docs/ROADMAP.md`](docs/ROADMAP.md) (ما الباقي). لا تبدأ أي تعديل قبل ذلك.
 
-> 📌 **آخر تسليم:** [`docs/HANDOFF.md`](docs/HANDOFF.md) — 2.6.0 مبنيّ ومنشور ومتحقق. التدقيق الشامل: [`docs/AUDIT_2.6.0.md`](docs/AUDIT_2.6.0.md) · الدروس التقنية: [`docs/AGENT_SKILLS.md`](docs/AGENT_SKILLS.md).
+> 📌 **آخر تسليم:** [`docs/HANDOFF.md`](docs/HANDOFF.md) — 2.6.0 مبنيّ ومنشور ومتحقق + `update.json`. آخر تدقيق شامل: [`docs/AUDIT_2.5.0.md`](docs/AUDIT_2.5.0.md) · الدروس التقنية: [`docs/AGENT_SKILLS.md`](docs/AGENT_SKILLS.md) · قرارات المالك: [`docs/adr/`](docs/adr/README.md).
 
 ## تشغيل سريع
 
