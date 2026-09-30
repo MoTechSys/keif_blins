@@ -1,21 +1,27 @@
-# تسليم الجلسة — 2.5.0 منشور · **2.6.0 في الكود (مكتمل الميزات إلا Onboarding) — لم يُبنَ بعد** (2026-09-30)
+# تسليم الجلسة — **2.6.0 منشور** (2026-09-30، بناء 3600/4600) · المؤجَّل في `docs/ROADMAP.md`
 
 ## الحالة الآن
-- `main` @ آخر commit (انظر `git log -1`) — analyze 0 · **153 اختبارًا ناجحًا** (`--exclude-tags audit`).
-- 2.6.0 يحوي: مجلدات بالعميل، هجري، ترقيم تاريخ/وقت افتراضي (شامل السندات)، نسخة خروج اختيارية + يومية 24 ساعة، StorageGuard، ورقة استعادة + عرض تلقائي بعد إعادة التثبيت، UpdateService كامل (Dart + Kotlin + Manifest + FileProvider)، تذييل المطوّر.
-- **إصلاح خفي مهم**: `pdfFoldersByClient` كان يُكتب ولا يُقرأ (غير مسجّل في `_kvKeys`) ⇒ أُصلح وأُضيف اختبار يحرس كل المفاتيح.
+- **منشور**: https://github.com/MoTechSys/diafa-apps/releases/tag/v2.6.0 — 4 ملفات، SHA-256 مُتحقَّق بعد التنزيل من GitHub، SHA-1 التوقيع `c874a9f4…`.
+- **`update.json`** منشور في مجلدَي diafa-apps؛ `test/update_live_audit_test.dart` (وسم audit) يثبت أن كود التطبيق الفعلي يقرأه ويرى التحديث من 2.5.0 وينزّل الملفات وتطابق بصماتها — 4/4.
+- analyze 0 · 153 اختبارًا (`--exclude-tags audit`) · tag `v2.6.0` في keif_blins.
+- **المتبقي**: كله في `docs/ROADMAP.md` (2.7.0: Onboarding، تدقيق UX، AUDIT §7) + اختبار يدوي على جهاز حقيقي (قائمة في ROADMAP).
 
-## المتبقي بالترتيب (لا تبدأ غيره)
-1. **Onboarding** (ADR-0008): 4 صفحات بسيطة (المجلد والصلاحية · الفواتير والترقيم · النسخ والاستعادة · التحديث) + «تخطي»؛ تُعرض بعد `storageAsked` وقبل الرئيسية؛ مفتاح `onboardingDone` محجوز في `Store.kvKeys`. أضِف شاشة `onboarding` إلى `ux_metrics_audit_test`.
-2. `flutter test test/ux_metrics_audit_test.dart` بعد Onboarding + لقطات في `docs/renders/v260_*.jpg` (settings-update, restore-sheet, drawer-footer).
-3. تحديث `CHANGELOG.md` (قسم 2.6.0 يحتاج إضافة: ترقيم، نسخ، StorageGuard، استعادة، تحديث، تذييل، إصلاح kvKeys).
-4. البناء والنشر 2.6.0 (الخطوات أدناه) — **بعد إذن المالك**. versionCode 3600/4600.
-5. **بعد النشر**: أنشئ `update.json` في `diafa-apps/كيف الضيافة/` و`أصول الضيافة/` (الصيغة في رأس `lib/core/update_service.dart`؛ الـ sha256 من `sha256sum` للملفات المنشورة، والروابط من صفحة الإصدار). بدون هذا الملف يعرض التطبيق «لا يمكن الوصول إلى خادم التحديث» — وهذا مقصود لا خطأ.
-6. تحديث `README.md`/`ECOSYSTEM.md` بالإصدار وخطوة update.json.
-
-## ملاحظة اختبار يدوي على جهاز (لا يمكن في الـ sandbox)
-- التثبيت من داخل التطبيق يحتاج جهازًا حقيقيًا: تأكد من ظهور شاشة «تثبيت التطبيقات غير المعروفة» ثم المتابعة التلقائية عند الرجوع.
-- منح «الوصول إلى كل الملفات» من حوار StorageGuard ثم الرجوع ⇒ يجب أن يُكمل العملية بلا ضغط إضافي.
+## خطوات الإصدار (نُفّذت لـ 2.6.0 — مرجع 2.7.0: غيّر الرقم فقط)
+```bash
+# 0) المفاتيح (خاص) — لا تُرفع أبدًا
+git clone https://github.com/MoTechSys/diafa-signing-keys /tmp/keys && cp /tmp/keys/android/release-key.jks /tmp/keys/android/key.properties android/
+# 1) البناء (~4-5 دقائق لكل نكهة؛ في الخلفية)
+flutter build apk --release --flavor keif  --dart-define=BRAND=keif  --split-per-abi --target-platform android-arm,android-arm64
+flutter build apk --release --flavor osool --dart-define=BRAND=osool --split-per-abi --target-platform android-arm,android-arm64
+# 2) التحقق: SHA-1 + versionCode + الحزمة + الصلاحيات + مزوّد update.fileprovider
+BT=/home/user/android-sdk/build-tools/35.0.0; for f in build/app/outputs/flutter-apk/*.apk; do $BT/apksigner verify --print-certs $f | grep SHA-1; $BT/aapt2 dump badging $f | head -1; done
+# 3) إعادة التسمية إلى keif-aldiafa-vX-{arm64,armv7}.apk / asoul-aldiafa-vX-… ثم sha256sum > SHA256SUMS
+# 4) release عبر REST (التوكن من ~/.git-credentials بعد setup_github_environment) + رفع الأصول إلى uploads.github.com
+# 5) نزّل الملفات من GitHub و sha256sum -c SHA256SUMS
+# 6) python3 tools/make_update_json.py X.Y.Z N /path/to/apks /home/user/diafa-apps   ← ينشئ update.json للمجلدين (عدّل notes داخله)
+# 7) diafa-apps: README (روابط) + CHANGELOG في المجلدين + push ؛ ثم flutter test test/update_live_audit_test.dart (بعد تعديل أرقام الإصدار فيه)
+# 8) keif_blins: HANDOFF + ECOSYSTEM + README + git tag vX.Y.Z + push --tags
+```
 
 ## ما أُنجز في 2.5.0 (كله في CHANGELOG.md بالتفصيل)
 1. **الوحدات المرنة**: `Org.units` + تبويب «الوحدات» في إعدادات الفواتير (إضافة/تعديل/حذف/ترتيب/استعادة) + شريحة «+ وحدة» داخل نموذج البند + PDF يعرض «الكمية (موقع)» عند توحّد الوحدة.

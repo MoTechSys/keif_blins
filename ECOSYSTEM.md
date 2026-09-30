@@ -72,6 +72,7 @@ flutter pub get && flutter analyze && flutter test      # 0 issues · كل ال�
 flutter build apk --release --flavor keif  --dart-define=BRAND=keif  --split-per-abi --target-platform android-arm,android-arm64
 flutter build apk --release --flavor osool --dart-define=BRAND=osool --split-per-abi --target-platform android-arm,android-arm64
 # 5) التحقق — يجب أن يطابق SHA-1 أعلاه واسم الحزمة
+# 6) بعد النشر: python3 tools/make_update_json.py X.Y.Z N <apks> <diafa-apps> ثم push — بدونه لا يظهر التحديث داخل التطبيق
 apksigner verify --print-certs build/app/outputs/flutter-apk/*.apk
 aapt2 dump badging <apk> | head -1
 ```
@@ -80,7 +81,7 @@ aapt2 dump badging <apk> | head -1
 8. حدّث `CHANGELOG.md` في keif_blins وفي مجلدي diafa-apps، وادفع.
 
 ## حالة العمل الجارية
-- **2.5.0 منشور** (2026-09-30) في [diafa-apps/releases/v2.5.0](https://github.com/MoTechSys/diafa-apps/releases/tag/v2.5.0) — التفاصيل في `keif_blins/docs/HANDOFF.md`. المتبقي: قرار المالك في خطة إصلاحات `docs/AUDIT_2.5.0.md` §7.
+- **2.6.0 منشور** (2026-09-30، بناء 3600/4600) + `update.json` في diafa-apps (التحديث داخل التطبيق يعمل منذ هذا الإصدار). المؤجَّل: `docs/ROADMAP.md`. ابدأ من `docs/START_HERE.md`.
 
 ## مستخدم المشروع
 
