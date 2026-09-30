@@ -17,7 +17,7 @@
 
 > **لوكيل جديد:** اقرأ `ECOSYSTEM.md` ثم هذا الملف ثم `docs/AGENT_GUIDE.md` (طريقة العمل ومعايير الدقة) ثم `CHANGELOG.md` (كل قرار وسببه). لا تبدأ أي تعديل قبل ذلك.
 
-> 📌 **آخر تسليم:** [`docs/HANDOFF_2.5.0.md`](docs/HANDOFF_2.5.0.md) — 2.5.0 مبنيّ ومنشور ومتحقق. التدقيق الشامل: [`docs/AUDIT_2.5.0.md`](docs/AUDIT_2.5.0.md) · الدروس التقنية: [`docs/AGENT_SKILLS.md`](docs/AGENT_SKILLS.md).
+> 📌 **آخر تسليم:** [`docs/HANDOFF.md`](docs/HANDOFF.md) — 2.5.0 مبنيّ ومنشور ومتحقق. التدقيق الشامل: [`docs/AUDIT_2.5.0.md`](docs/AUDIT_2.5.0.md) · الدروس التقنية: [`docs/AGENT_SKILLS.md`](docs/AGENT_SKILLS.md).
 
 ## تشغيل سريع
 
