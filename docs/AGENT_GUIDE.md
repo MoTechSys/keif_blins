@@ -1,6 +1,7 @@
 # دليل الوكيل — كيف تعمل على هذا المشروع بالدقة التي يطلبها المستخدم
 
 هذا الملف يصف **طريقة العمل** لا الكود. المنظومة (3 مستودعات) في `ECOSYSTEM.md`، الكود في `README.md`، والتاريخ والقرارات في `CHANGELOG.md`.
+الدروس التقنية المجرّبة (بيئة الـ sandbox، iframe المعاينة، أدوات القياس، قوالب CDP) في `AGENT_SKILLS.md` — **أضِف إليه** كل ما تكتشفه. آخر تدقيق شامل: `AUDIT_2.5.0.md`.
 
 ## 1. المستخدم وما يتوقعه
 
@@ -65,6 +66,15 @@ for i, p in enumerate(d):
 4. تحقق: `apksigner verify --print-certs` (SHA-1 `C8:74:…:F9:AA`) و`aapt2 dump badging` (الحزمة + versionCode).
 5. انشر الإصدار في **diafa-apps** (ليس هنا) عبر REST API، ثم نزّل الملفات وقارن SHA-256.
 6. حدّث CHANGELOG هنا وفي مجلدي diafa-apps.
+
+## 6ب. أدوات التدقيق (وسم `audit` — لا تدخل في `flutter test` الافتراضي إن استُثني الوسم)
+| الأداة | ماذا تعطي | الزمن |
+|---|---|---|
+| `test/screenshot_audit_test.dart` | 27 شاشة × 3 مواضع تمرير × علامتان بخط Tajawal ⇐ `build/audit/` | ~50 ث |
+| `test/ux_metrics_audit_test.dart` | 18 شاشة × 3 مقاسات × علامتان + أهداف اللمس < 48dp + overflow ⇐ `build/ux/report.json` | ~45 ث |
+| `test/scale_bench_audit_test.dart` | زمن الحفظ/الفتح/الكشف عند 100/1000/3000 فاتورة + زمن PDF ⇐ `build/ux/scale.json` | ~8 دقائق |
+
+بعد أي تعديل واجهة: شغّل الأولى والثانية وافحص اللقطات على 320 dp أولًا.
 
 ## 7. مواضع يسهل الخطأ فيها
 

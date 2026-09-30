@@ -86,7 +86,7 @@ aapt2 dump badging <apk> | head -1
 
 - يكتب بالعربية (لهجة) ويريد الرد **بالعربية فقط**، قصيرًا ومباشرًا وموثّقًا بالتحقق الفعلي.
 - لا تقل «تم» عن شيء لم تتحقق منه بنفسك (صورة، اختبار، تنزيل فعلي).
-- دليل طريقة العمل التفصيلي: `keif_blins/docs/AGENT_GUIDE.md`.
+- دليل طريقة العمل التفصيلي: `keif_blins/docs/AGENT_GUIDE.md` · دروس تقنية مجرّبة (sandbox، iframe، قياس، CDP): `docs/AGENT_SKILLS.md` · آخر تدقيق أداء/واجهات: `docs/AUDIT_2.5.0.md`.
 
 ## أسرار — لا تُكتب في أي مستودع عام أبدًا
 - `key.properties` / `*.jks` ⇐ في diafa-signing-keys فقط (مُتجاهلة في keif_blins عبر `android/.gitignore`).

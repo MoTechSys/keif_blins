@@ -35,6 +35,11 @@
 | asoul-aldiafa-v2.5.0-arm64.apk | 12.1 م.ب | `834a9cfc9e672bf2b8a6e20151cf9cde3fae64124024e88d8830f8a454b993da` |
 | asoul-aldiafa-v2.5.0-armv7.apk | 12.0 م.ب | `aba18a078069d90aacaac2727aae340b405a14b5deda50b184eaf637679c6e88` |
 
+### بعد النشر (في الكود، ليس في APK 2.5.0)
+- المعاينة على الويب داخل iframe مقيّد: تخطي service worker عند SecurityError (`web/index.html`)، Hive في الذاكرة عند رفض IndexedDB (`db.dart`)، `LicenseService` يتحمّل تعذّر localStorage. لا يمس أندرويد.
+- أدوات تدقيق جديدة (وسم audit): `ux_metrics_audit_test.dart` (108 لقطة + أهداف لمس + overflow) و`scale_bench_audit_test.dart` (قابلية التوسّع + زمن PDF).
+- توثيق: `docs/AUDIT_2.5.0.md` (النتائج المقيسة + خطة إصلاح 8 بنود لم تُنفَّذ) و`docs/AGENT_SKILLS.md` (دروس تقنية مجرّبة للوكلاء).
+
 ## [2.5.0] — قيد العمل (ملاحظات العميل على 2.2.0)
 
 ### نموذج الفاتورة/عرض السعر
