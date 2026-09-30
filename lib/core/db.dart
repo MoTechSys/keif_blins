@@ -204,7 +204,7 @@ class HiveDb implements AppDb {
   static bool skipInit = false;
 
   @override
-  String get engine => 'IndexedDB (Hive)';
+  String get engine => memoryOnly ? 'ذاكرة مؤقتة (معاينة)' : 'IndexedDB (Hive)';
   @override
   String? get path => null;
 
@@ -223,8 +223,21 @@ class HiveDb implements AppDb {
   @override
   Future<void> open(String name) async {
     await ensureInit();
-    _box = await Hive.openBox(name);
+    try {
+      _box = await Hive.openBox(name);
+    } catch (e) {
+      // الويب فقط: iframe مقيّد (sandbox بلا allow-same-origin) يجعل الأصل مبهمًا
+      // فيرفض المتصفح IndexedDB. نعمل في الذاكرة كي تظهر المعاينة بدل شاشة الخطأ.
+      // على أندرويد لا يمرّ التطبيق من هنا إطلاقًا (SqliteDb).
+      if (!kIsWeb) rethrow;
+      debugPrint('HiveDb: IndexedDB غير متاح ($e) — تخزين مؤقت في الذاكرة');
+      _box = await Hive.openBox(name, bytes: Uint8List(0));
+      memoryOnly = true;
+    }
   }
+
+  /// true عندما تعذّر IndexedDB وعمل الصندوق في الذاكرة (لا يبقى بعد إعادة التحميل)
+  bool memoryOnly = false;
 
   @override
   Future<List<Map<String, dynamic>>> all(String table) async {

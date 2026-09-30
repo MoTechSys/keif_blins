@@ -33,6 +33,14 @@
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
+  <!-- لوحات المعاينة تضع الصفحة في iframe مقيّد (sandbox بلا allow-same-origin): قراءة navigator.serviceWorker
+       ترمي SecurityError فيتوقف flutter_bootstrap قبل الرسم (شاشة سوداء). نُخفي الخاصية عند القيود فيتخطاها المحمّل. -->
+  <script>
+    (function () {
+      try { void navigator.serviceWorker; }
+      catch (e) { delete Navigator.prototype.serviceWorker; } // المحمّل يفحص ('serviceWorker' in navigator) ثم يتخطى بأمان
+    })();
+  </script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

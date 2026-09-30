@@ -89,8 +89,15 @@ class LicenseService extends ChangeNotifier {
 
   /// الفحص الأول: يعرض آخر حالة محفوظة فورًا ثم يحدّثها من الشبكة
   Future<void> init() async {
-    final prefs = await SharedPreferences.getInstance();
-    _state = _fromCache(prefs);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _state = _fromCache(prefs);
+    } catch (e) {
+      // الويب داخل iframe مقيّد: localStorage يرمي SecurityError. لا نقفل التطبيق
+      // بسبب تعذّر التخزين — نعرض الحالة الافتراضية (مسموح) ونكمل.
+      debugPrint('LicenseService.init: prefs unavailable ($e)');
+      _state = const LicenseState(allowed: true, message: '', codeAccepted: false);
+    }
     notifyListeners();
     await refresh();
   }
@@ -113,6 +120,10 @@ class LicenseService extends ChangeNotifier {
       _state = st;
       notifyListeners();
       return st;
+    } catch (e) {
+      // تعذّر التخزين (ويب مقيّد) أو خطأ غير متوقع: نُبقي آخر حالة معروفة — لا قفل خاطئ
+      debugPrint('LicenseService.refresh failed: $e');
+      return _state ?? const LicenseState(allowed: true);
     } finally {
       _checking = false;
     }
