@@ -112,7 +112,10 @@ for i in z.infolist(): c[i.filename.split('/')[0]]+=i.compress_size
 ### د9. خطوط حقيقية في اختبارات اللقطات
 افتراضيًا `flutter test` يرسم بخط Ahem (مربعات) ⇐ اللقطة لا تعني شيئًا للعربية. حمّل `FontLoader('Tajawal')` من `assets/fonts` و`MaterialIcons` من `/opt/flutter/bin/cache/artifacts/material_fonts/` في `setUpAll`. (موجود في `screenshot_audit_test.dart`.)
 
-### د10. CanvasKit هو 70% من إقلاع الويب
+### د10. `flutter test` يحجب الشبكة — كل طلب HTTP يعيد 400
+`TestWidgetsFlutterBinding` يضبط `HttpOverrides.global` بعميل مزيّف. لاختبار حيّ ضد خدمة حقيقية: `HttpOverrides.global = null` داخل try/finally ثم أعِد السابق. **لا** تستخدم `HttpOverrides.runZoned(createHttpClient: (_) => HttpClient())` — `HttpClient()` يعود إلى التجاوز نفسه ⇐ Stack Overflow. ضع الاختبارات الحيّة تحت وسم `audit` كي لا تفشل بلا إنترنت.
+
+### د11. CanvasKit هو 70% من إقلاع الويب
 6.9 م.ب wasm. للويب كمنتج: `--web-renderer html` (أصغر، أضعف خطوطًا) أو استضافة تدعم brotli (2.8 ← ~2.0 م.ب). لأندرويد لا ينطبق.
 
 ---
@@ -167,6 +170,9 @@ im=Image.open(p).convert("RGB").crop((0,0,W,H)); c=im.getcolors(1<<20); c.sort(r
 الصق 4 لقطات جنبًا إلى جنب بـ PIL بفاصل 10 px ثم `thumbnail((1900,1400))` ⇐ صورة واحدة تكفي لفحص 4 شاشات دفعة واحدة وتوفر استدعاءات `Read`.
 
 ---
+
+### د12. تدقيق «هل الكود المنشور هو ما راجعته؟»
+`unzip -p app.apk lib/arm64-v8a/libapp.so | strings -n 8 | grep <ثابت مميز>` — الثوابت النصية (أسماء نطاقات، مسارات) تبقى في AOT. إن لم تظهر فالـ APK من كود مختلف.
 
 ## و. النشر والتوقيع (مختصر — التفصيل في ECOSYSTEM)
 

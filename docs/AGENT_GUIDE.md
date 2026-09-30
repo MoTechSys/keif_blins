@@ -73,6 +73,7 @@ for i, p in enumerate(d):
 | `test/screenshot_audit_test.dart` | 27 شاشة × 3 مواضع تمرير × علامتان بخط Tajawal ⇐ `build/audit/` | ~50 ث |
 | `test/ux_metrics_audit_test.dart` | 18 شاشة × 3 مقاسات × علامتان + أهداف اللمس < 48dp + overflow ⇐ `build/ux/report.json` | ~45 ث |
 | `test/scale_bench_audit_test.dart` | زمن الحفظ/الفتح/الكشف عند 100/1000/3000 فاتورة + زمن PDF ⇐ `build/ux/scale.json` | ~8 دقائق |
+| `test/license_live_audit_test.dart` | القفل عن بُعد **حيًّا** ضد GitHub الفعلي (يحتاج إنترنت) + آلة الحالات بمحتوى الملفين الفعليين | ~6 ث |
 
 بعد أي تعديل واجهة: شغّل الأولى والثانية وافحص اللقطات على 320 dp أولًا.
 
