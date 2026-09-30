@@ -63,6 +63,8 @@ class Store extends ChangeNotifier {
       ready = true;
       // نسخة اليوم عند الفتح (إن لم تُكتب بعد) — لا تنتظر الواجهة
       unawaited(BackupService.dailyIfDue(this));
+      // ترحيل مجلدات PDF من «النوع/السنة» إلى «النوع/العميل» (مرة واحدة، بصمت)
+      unawaited(_migratePdfFoldersOnce());
     } catch (e, st) {
       debugPrint('Store.init failed: $e\n$st');
       initError = '$e';
@@ -223,6 +225,21 @@ class Store extends ChangeNotifier {
 
   Future<void> _save(String key) => _saveAll([key]);
 
+  /// ترحيل هيكل مجلدات PDF (≤ 2.5.0 بالسنة ⇐ 2.6.0 بالعميل) مرة واحدة فقط
+  Future<void> _migratePdfFoldersOnce() async {
+    if (!FileService.supported) return;
+    if (_kv['pdfFoldersByClient'] == true) return;
+    try {
+      final n = await FileService.migrateYearFoldersToClients(
+        clientFromFileName,
+      );
+      debugPrint('Store: moved $n PDF files into client folders');
+      await setKv('pdfFoldersByClient', true);
+    } catch (e) {
+      debugPrint('Store._migratePdfFoldersOnce: $e');
+    }
+  }
+
   /* ---------- النسخ الاحتياطي التلقائي إلى مجلد الهاتف ---------- */
   Timer? _backupTimer;
 
@@ -236,14 +253,29 @@ class Store extends ChangeNotifier {
     if (v) _scheduleAutoBackup();
   }
 
+  /// هل هناك تعديل لم تُكتب له نسخة احتياطية بعد؟ (يُصفَّر عند نجاح النسخة)
+  bool backupDirty = false;
+
   /// بعد أي تغيير: ننتظر 4 ثوانٍ (لتجميع التعديلات المتتالية) ثم نحدّث نسخة اليوم
   void _scheduleAutoBackup() {
-    if (!FileService.supported || !autoBackupEnabled) return;
+    if (!FileService.supported) return;
+    backupDirty = true;
+    if (!autoBackupEnabled) return;
     _backupTimer?.cancel();
     _backupTimer = Timer(
       const Duration(seconds: 4),
       () => backupNow(auto: true),
     );
+  }
+
+  /// عند خروج التطبيق إلى الخلفية/إغلاقه: لا ننتظر المؤقّت — نكتب نسخة اليوم فورًا
+  /// إن كان هناك تعديل معلّق. (أندرويد قد يقتل العملية في أي لحظة بعد paused،
+  /// لذلك هذه آخر فرصة مضمونة للكتابة.) تعيد المسار أو null إن لم يلزم/فشل.
+  Future<String?> flushBackupOnExit() async {
+    if (!FileService.supported || !autoBackupEnabled) return null;
+    if (!backupDirty) return null;
+    _backupTimer?.cancel();
+    return backupNow(auto: true);
   }
 
   /// كتابة نسخة احتياطية مُتحقَّق منها إلى مجلد الهاتف الآن. تعيد المسار أو null
@@ -253,6 +285,7 @@ class Store extends ChangeNotifier {
     if (auto && isEmpty) return null;
     final r = await BackupService.writeLocal(this, auto: auto);
     if (r != null) {
+      backupDirty = false;
       lastAutoBackupPath = r;
       lastAutoBackupAt = DateTime.now();
       notifyListeners();
@@ -321,6 +354,26 @@ class Store extends ChangeNotifier {
   /// إشعار تسليم - رقم الفاتورة - اسم العميل.pdf
   String deliveryFileName(Invoice d) =>
       'إشعار تسليم - ${d.number} - ${docClientName(d)}.pdf';
+
+  /// عكس أسماء الملفات أعلاه: يستنتج اسم العميل/الجهة من اسم ملف محفوظ
+  /// (لترحيل مجلدات السنة القديمة إلى مجلدات العملاء). null إن لم يُعرف.
+  ///   فاتورة INV-0005 - العميل.pdf        ⇐ العميل
+  ///   سند قبض REC-0001 - العميل.pdf       ⇐ العميل
+  ///   كشف حساب - العميل - 2026-09-30.pdf   ⇐ العميل
+  ///   خطاب مطالبة CLM-0001 - الجهة.pdf     ⇐ الجهة
+  static String? clientFromFileName(String fileName) {
+    var n = fileName.trim();
+    if (n.toLowerCase().endsWith('.pdf')) n = n.substring(0, n.length - 4);
+    final parts = n.split(' - ').map((e) => e.trim()).toList();
+    if (parts.length < 2) return null;
+    if (parts.first.startsWith('كشف حساب')) {
+      // كشف حساب[ تفصيلي] - العميل - التاريخ
+      return parts.length >= 3 ? parts[1] : null;
+    }
+    // النوع + الرقم - العميل
+    final c = parts.sublist(1).join(' - ');
+    return c.isEmpty ? null : c;
+  }
 
   ClientSummary summary(Client c) => clientSummary(c, docs, payments);
 

@@ -2,6 +2,7 @@
 library;
 
 import 'brand.dart';
+import 'hijri.dart';
 import 'money.dart';
 
 String uid(String prefix) {
@@ -38,6 +39,15 @@ String fmtDate(String? iso) {
   // اليوم قد يكون "04" أو "4" أو "04T10:00:00" — نأخذ الأرقام الأولى فقط
   final dayDigits = RegExp(r'^\d{1,2}').firstMatch(p[2])?.group(0) ?? p[2];
   return '${p[0]}/${int.tryParse(p[1]) ?? p[1]}/${int.tryParse(dayDigits) ?? dayDigits}';
+}
+
+/// التاريخ للعرض مع الهجري إن كان مفعّلًا: «2026/9/30 (1448/4/19هـ)»؛
+/// بدون تفعيل = fmtDate فقط. لا يُستخدم داخل أسماء الملفات.
+String fmtDateH(String? iso, {required bool hijri, bool long = false}) {
+  final g = fmtDate(iso);
+  if (!hijri || g.isEmpty) return g;
+  final h = UmmAlQura.fromIso(iso, long: long);
+  return h.isEmpty ? g : '$g ($h)';
 }
 
 /// ISO → "أغسطس 2026"
@@ -1014,6 +1024,9 @@ class Org {
   bool showRemaining; // سطر المدفوع/المتبقي في الفاتورة
   bool showEventBlock; // بطاقة تفاصيل المناسبة
 
+  /// إظهار التاريخ الهجري (أم القرى) بجوار الميلادي في المستندات والواجهة
+  bool hijriEnabled;
+
   Org({
     String? name,
     String? nameEn,
@@ -1052,6 +1065,7 @@ class Org {
     this.showAck = false,
     this.showRemaining = true,
     this.showEventBlock = true,
+    this.hijriEnabled = false,
     this.claimPrefix = 'CLM-',
     this.logoPath = '',
     this.stampPath = '',
@@ -1123,6 +1137,7 @@ class Org {
     'showAck': showAck,
     'showRemaining': showRemaining,
     'showEventBlock': showEventBlock,
+    'hijriEnabled': hijriEnabled,
     'claimPrefix': claimPrefix,
     'logoPath': logoPath,
     'stampPath': stampPath,
@@ -1173,6 +1188,7 @@ class Org {
       showAck: (m['showAck'] as bool?) ?? false,
       showRemaining: (m['showRemaining'] as bool?) ?? true,
       showEventBlock: (m['showEventBlock'] as bool?) ?? true,
+      hijriEnabled: (m['hijriEnabled'] as bool?) ?? false,
       claimPrefix: (m['claimPrefix'] as String?) ?? 'CLM-',
       logoPath: (m['logoPath'] as String?) ?? '',
       stampPath: (m['stampPath'] as String?) ?? '',

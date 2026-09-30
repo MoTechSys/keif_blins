@@ -61,6 +61,10 @@ void main() {
     expect(FileService.yearOf('garbage'), DateTime.now().year.toString());
     expect(FileService.safeName('INV/2026:01?.pdf'), 'INV-2026-01-.pdf');
     expect(FileKind.invoice.folder, 'الفواتير');
-    expect(FileKind.backup.byYear, isFalse);
+    expect(FileKind.backup.byClient, isFalse);
+    expect(FileKind.invoice.byClient, isTrue);
+    expect(FileService.clientFolder('شركة/طلوع:الجزيرة'), 'شركة-طلوع-الجزيرة');
+    expect(FileService.clientFolder(''), 'بدون عميل');
+    expect(FileService.clientFolder(null), 'بدون عميل');
   });
 }

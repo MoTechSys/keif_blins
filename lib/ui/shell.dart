@@ -59,12 +59,16 @@ class _ShellState extends State<Shell> with WidgetsBindingObserver {
       case AppLifecycleState.paused:
       case AppLifecycleState.hidden:
         lock.onPaused();
+        // نسخة احتياطية فورية عند الخروج (إن كان هناك تعديل لم يُحفظ في نسخة بعد)
+        context.read<Store>().flushBackupOnExit();
       case AppLifecycleState.resumed:
         lock.onResumed();
         context.read<LicenseService>().onResumed();
+      case AppLifecycleState.detached:
+        // إغلاق كامل: آخر فرصة للكتابة
+        context.read<Store>().flushBackupOnExit();
       case AppLifecycleState
           .inactive: // نوافذ النظام (المشاركة/الصلاحيات) لا تُقفل التطبيق
-      case AppLifecycleState.detached:
         break;
     }
   }

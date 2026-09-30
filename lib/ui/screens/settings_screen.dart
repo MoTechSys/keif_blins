@@ -17,6 +17,7 @@ import '../../core/backup_service.dart';
 import '../../core/drive_service.dart';
 import '../../core/file_service.dart';
 import '../../core/lock_service.dart';
+import '../../core/hijri.dart';
 import '../../core/models.dart';
 import '../../core/money.dart';
 import '../../core/store.dart';
@@ -29,7 +30,7 @@ import 'lock_screen.dart';
    مركز الإعدادات (ملاحظة 4/12) — إعدادات حقيقية فقط
    ============================================================ */
 class SettingsHub extends StatelessWidget {
-  static const version = '2.5.0';
+  static const version = '2.6.0';
   const SettingsHub({super.key});
 
   @override
@@ -403,6 +404,16 @@ class _ElementsTab extends StatelessWidget {
                     : 'VAT ${o.vat}',
                 o.showVatNumber,
                 (v) => store.saveOrg(o..showVatNumber = v),
+              ),
+              const Divider(),
+              _check(
+                Ic.calendar,
+                'التاريخ الهجري',
+                o.hijriEnabled
+                    ? 'يظهر بجوار الميلادي في المستندات والتطبيق — اليوم ${UmmAlQura.fromIso(todayISO())}'
+                    : 'ميلادي فقط. عند التفعيل يُكتب الهجري (أم القرى) بين قوسين',
+                o.hijriEnabled,
+                (v) => store.saveOrg(o..hijriEnabled = v),
               ),
             ],
           ),

@@ -252,7 +252,7 @@ Future<void> openStatement(BuildContext context, Client c) async {
               )).statementDetailed(st, store.payments)
             : (await DocPdf.create(store.org)).statement(st),
         kind: FileKind.statement,
-        year: FileService.yearOf(st.issueDate),
+        client: c.name,
       ),
     ),
   );

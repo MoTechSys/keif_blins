@@ -459,7 +459,7 @@ class _ClaimFormState extends State<ClaimForm> {
           message: claimMessage(x, store.org),
           build: () async => (await DocPdf.create(store.org)).claim(x),
           kind: FileKind.claim,
-          year: FileService.yearOf(x.date),
+          client: x.recipient,
         ),
       ),
     );
@@ -641,7 +641,10 @@ class _ClaimFormState extends State<ClaimForm> {
                           ),
                         ),
                         child: Text(
-                          fmtDate(c.date),
+                          fmtDateH(
+                            c.date,
+                            hijri: context.read<Store>().org.hijriEnabled,
+                          ),
                           style: const TextStyle(fontWeight: FontWeight.w700),
                         ),
                       ),

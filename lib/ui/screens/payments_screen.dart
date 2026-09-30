@@ -215,7 +215,7 @@ class _PaymentsScreenState extends State<PaymentsScreen> {
             store.org,
           )).receipt(p, c, inv, payments: store.payments),
           kind: FileKind.receipt,
-          year: FileService.yearOf(p.date),
+          client: c.name,
         ),
       ),
     );

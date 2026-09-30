@@ -72,6 +72,25 @@ void main() {
     File('${dir.path}/$name').writeAsBytesSync(bytes);
   }
 
+  test(
+    'invoice + receipt PDF with hijri enabled render (أم القرى بجوار الميلادي)',
+    () async {
+      final o2 = Org.fromMap(org.toMap())..hijriEnabled = true;
+      final pdf = await DocPdf.create(o2);
+      final bytes = await pdf.invoice(inv, pays, client: client);
+      expect(String.fromCharCodes(bytes.take(5)), '%PDF-');
+      await save('invoice_hijri.pdf', bytes);
+      final rb = await pdf.receipt(pays.first, client, inv, payments: pays);
+      await save('receipt_hijri.pdf', rb);
+      // التنسيق النصي نفسه الذي يدخل الـ PDF
+      expect(
+        fmtDateH(inv.issueDate, hijri: true),
+        matches(RegExp(r'^\d{4}/\d{1,2}/\d{1,2} \(\d{4}/\d{1,2}/\d{1,2}هـ\)$')),
+      );
+      expect(fmtDateH(inv.issueDate, hijri: false), fmtDate(inv.issueDate));
+    },
+  );
+
   test('invoice PDF renders', () async {
     final pdf = await DocPdf.create(org);
     final bytes = await pdf.invoice(inv, pays, client: client);

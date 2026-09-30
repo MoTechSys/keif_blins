@@ -198,7 +198,10 @@ class _PaymentFormState extends State<PaymentForm> {
                     ),
                   ),
                   child: Text(
-                    fmtDate(p.date),
+                    fmtDateH(
+                      p.date,
+                      hijri: context.read<Store>().org.hijriEnabled,
+                    ),
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                 ),
@@ -312,7 +315,7 @@ class _PaymentFormState extends State<PaymentForm> {
               store.org,
             )).receipt(p, c, inv, payments: store.payments),
             kind: FileKind.receipt,
-            year: FileService.yearOf(p.date),
+            client: c.name,
           ),
         ),
       );

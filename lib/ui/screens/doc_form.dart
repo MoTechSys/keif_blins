@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/hijri.dart';
 import '../../core/models.dart';
 import '../../core/money.dart';
 import '../../core/store.dart';
@@ -597,6 +598,11 @@ class _DocFormState extends State<DocForm> {
                   onPressed: () => setState(() => set('')),
                 )
               : null,
+          // الهجري (أم القرى) كسطر مساعد صغير تحت الحقل عند تفعيله — لا يزاحم السطر الأساسي
+          helperText: context.read<Store>().org.hijriEnabled && value.isNotEmpty
+              ? UmmAlQura.fromIso(value, long: true)
+              : null,
+          helperStyle: TextStyle(color: C.text3, fontSize: 11),
         ),
         // سطر واحد دائمًا: الأرقام اللاتينية LTR، ويُصغَّر الخط تلقائيًا في الأعمدة الضيقة
         // (تاريخ المناسبة + إلى تاريخ جنبًا إلى جنب على 360px) بدل الالتفاف على سطرين

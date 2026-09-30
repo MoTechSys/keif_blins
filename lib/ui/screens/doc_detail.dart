@@ -132,12 +132,12 @@ class DocDetail extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   [
-                    fmtDate(d.issueDate),
+                    fmtDateH(d.issueDate, hijri: store.org.hijriEnabled),
                     if (d.eventDate.isNotEmpty)
                       'المناسبة ${fmtDate(d.eventDate)}${d.eventDateTo.isNotEmpty && d.eventDateTo != d.eventDate ? ' → ${fmtDate(d.eventDateTo)}' : ''}',
                     if (d.location.isNotEmpty) d.location,
                     if (isQ && d.validUntil.isNotEmpty)
-                      'ساري حتى ${fmtDate(d.validUntil)}',
+                      'ساري حتى ${fmtDateH(d.validUntil, hijri: store.org.hijriEnabled)}',
                     if (d.isQuick)
                       'عرض سريع${d.quickPhone.trim().isNotEmpty ? ' • ${d.quickPhone.trim()}' : ''}',
                   ].join(' • '),
@@ -228,7 +228,7 @@ class DocDetail extends StatelessWidget {
                         bytes,
                         d.isQuote ? FileKind.quote : FileKind.invoice,
                         name,
-                        year: FileService.yearOf(d.issueDate),
+                        client: store.docClientName(d),
                       );
                       if (saved != null) {
                         await FileService.share(
@@ -504,7 +504,7 @@ class DocDetail extends StatelessWidget {
             store.org,
           )).invoice(d, store.payments, client: store.client(d.clientId)),
           kind: d.isQuote ? FileKind.quote : FileKind.invoice,
-          year: FileService.yearOf(d.issueDate),
+          client: store.docClientName(d),
         ),
       ),
     );

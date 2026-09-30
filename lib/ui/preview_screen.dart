@@ -19,8 +19,8 @@ class PreviewScreen extends StatefulWidget {
   /// نوع المستند — يحدد المجلد الذي يُحفظ فيه الملف تلقائيًا على الهاتف
   final FileKind? kind;
 
-  /// سنة المستند (مجلد السنة)
-  final String? year;
+  /// اسم العميل/الجهة (مجلد العميل داخل مجلد النوع)
+  final String? client;
   const PreviewScreen({
     super.key,
     required this.title,
@@ -28,7 +28,7 @@ class PreviewScreen extends StatefulWidget {
     required this.message,
     required this.build,
     this.kind,
-    this.year,
+    this.client,
   });
 
   @override
@@ -66,7 +66,7 @@ class _PreviewScreenState extends State<PreviewScreen> {
       b,
       k,
       widget.fileName,
-      year: widget.year,
+      client: widget.client,
     );
     if (mounted && p != null) setState(() => _savedPath = p);
   }

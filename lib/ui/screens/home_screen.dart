@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/brand.dart';
+import '../../core/hijri.dart';
 import '../../core/models.dart';
 import '../../core/money.dart';
 import '../../core/store.dart';
@@ -227,13 +228,29 @@ class _TopBar extends StatelessWidget {
           children: [
             const KIcon(Ic.calendar, size: 16),
             const SizedBox(width: 6),
-            Text(
-              fmtDate(todayISO()),
-              style: TextStyle(
-                color: C.goldInk,
-                fontWeight: FontWeight.w800,
-                fontSize: 12,
-              ),
+            // اليوم: ميلادي، وتحته الهجري (أم القرى) إن كان مفعّلًا — سطران صغيران بلا ازدحام
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  fmtDate(todayISO()),
+                  style: TextStyle(
+                    color: C.goldInk,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 12,
+                  ),
+                ),
+                if (context.select<Store, bool>((s) => s.org.hijriEnabled))
+                  Text(
+                    UmmAlQura.fromIso(todayISO()),
+                    style: TextStyle(
+                      color: C.text3,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 10,
+                    ),
+                  ),
+              ],
             ),
           ],
         ),

@@ -102,8 +102,8 @@ class DocPdf {
             ],
             left: [
               (isQ ? 'رقم العرض' : 'رقم الفاتورة', inv.number, true),
-              ('التاريخ', fmtDate(inv.issueDate), true),
-              if (isQ) ('ساري حتى', fmtDate(inv.validUntil), true),
+              ('التاريخ', _hd(inv.issueDate), !org.hijriEnabled),
+              if (isQ) ('ساري حتى', _hd(inv.validUntil), !org.hijriEnabled),
               if (org.showEventBlock)
                 ('عدد الحضور التقريبي', inv.attendees, true),
             ],
@@ -175,6 +175,10 @@ class DocPdf {
     );
     return doc.save();
   }
+
+  /// تاريخ الترويسة: ميلادي + (هجري أم القرى) إن كان مفعّلًا في الإعدادات.
+  /// عند التفعيل تُرسم القيمة RTL (لا LTR) لأنها مختلطة؛ الأرقام تبقى صحيحة داخل كل جزء.
+  String _hd(String? iso) => fmtDateH(iso, hijri: org.hijriEnabled);
 
   String _eventRange(Invoice inv) {
     if (inv.eventDate.isEmpty) return '';
@@ -510,7 +514,7 @@ class DocPdf {
             ],
             left: [
               ('رقم الكشف', s.number, true),
-              ('تاريخ الإصدار', fmtDate(s.issueDate), true),
+              ('تاريخ الإصدار', _hd(s.issueDate), !org.hijriEnabled),
               ('الفترة', period, false),
               ('عدد الفواتير', '${s.count}', true),
             ],
@@ -673,7 +677,7 @@ class DocPdf {
         ],
         left: [
           ('رقم الكشف', s.number, true),
-          ('تاريخ الإصدار', fmtDate(s.issueDate), true),
+          ('تاريخ الإصدار', _hd(s.issueDate), !org.hijriEnabled),
           ('الفترة', period, false),
           ('عدد الفواتير', '${s.count}', true),
         ],
@@ -1706,9 +1710,12 @@ class DocPdf {
                           style: a.t(10.8, color: O.brown, bold: true),
                         ),
                         pw.Text(
-                          fmtDate(p.date),
+                          _hd(p.date),
                           style: a.t(11.2, color: O.ink, bold: true),
-                          textDirection: pw.TextDirection.ltr,
+                          // مع الهجري النص مختلط (أرقام + «هـ») ⇐ RTL كي لا ينعكس الترتيب
+                          textDirection: org.hijriEnabled
+                              ? null
+                              : pw.TextDirection.ltr,
                         ),
                       ],
                     ),
@@ -1981,7 +1988,11 @@ class DocPdf {
               ('الموضوع', c.subject.trim(), false),
             ],
             left: [
-              ('التاريخ', _dmy(c.date), true),
+              (
+                'التاريخ',
+                org.hijriEnabled ? _hd(c.date) : _dmy(c.date),
+                !org.hijriEnabled,
+              ),
               ('رقم الخطاب', c.number, true),
             ],
           ),

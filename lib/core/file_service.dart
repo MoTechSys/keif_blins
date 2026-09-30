@@ -2,12 +2,15 @@
 ///
 /// البنية في **جذر الذاكرة الداخلية** (مثل واتساب) — تُنشأ كلها فور تشغيل التطبيق:
 ///   /storage/emulated/0/<اسم التطبيق>/
-///     ├── الفواتير/2026/فاتورة INV-0001 - العميل.pdf
-///     ├── عروض الأسعار/2026/…
-///     ├── خطابات المطالبة/2026/…
-///     ├── كشوف الحساب/2026/…
-///     ├── سندات القبض/2026/…
+///     ├── الفواتير/<اسم العميل>/فاتورة INV-0001 - العميل.pdf
+///     ├── عروض الأسعار/<اسم العميل>/…
+///     ├── خطابات المطالبة/<اسم العميل>/…
+///     ├── كشوف الحساب/<اسم العميل>/…
+///     ├── سندات القبض/<اسم العميل>/…
 ///     └── النسخ الاحتياطية/keif-auto-2026-09-27.json
+///
+/// (حتى 2.5.0 كان التقسيم بالسنة بدل العميل؛ عند أول تشغيل بعد التحديث تُنقل الملفات
+/// القديمة تلقائيًا إلى مجلد عميلها إن عُرف من اسم الملف، وإلا تبقى في مكانها.)
 ///
 /// أندرويد 11+ يتطلب «الوصول إلى كل الملفات» للكتابة في الجذر: يُطلب مرة واحدة من شاشة
 /// الإعداد مع شرح. إن رفض المستخدم نستخدم `Documents/<اسم التطبيق>` (لا يحتاج صلاحية)،
@@ -38,8 +41,8 @@ extension FileKindX on FileKind {
     FileKind.backup => 'النسخ الاحتياطية',
   };
 
-  /// المستندات تُرتَّب داخل مجلد السنة؛ النسخ الاحتياطية لا
-  bool get byYear => this != FileKind.backup;
+  /// المستندات تُرتَّب داخل مجلد العميل؛ النسخ الاحتياطية لا
+  bool get byClient => this != FileKind.backup;
 }
 
 /// أين يقع المجلد الأساسي حاليًا
@@ -83,6 +86,14 @@ class FileService {
   static StorageLocation _loc = StorageLocation.none;
   static bool _resolved = false;
 
+  /// للاختبارات فقط: تثبيت المجلد الأساسي على مسار مؤقت بدل حلّ مسارات أندرويد
+  @visibleForTesting
+  static void debugSetBase(Directory? d) {
+    _base = d;
+    _loc = d == null ? StorageLocation.none : StorageLocation.appInternal;
+    _resolved = d != null;
+  }
+
   /// وصف مقروء لمكان المجلد (يظهر في الإعدادات)
   static String? get basePath => _base?.path;
   static StorageLocation get location => _loc;
@@ -117,12 +128,9 @@ class FileService {
   static Future<void> ensureTree() async {
     final b = _base;
     if (b == null) return;
-    final y = DateTime.now().year.toString();
     for (final k in FileKind.values) {
       try {
-        await Directory(
-          '${b.path}/${k.folder}${k.byYear ? '/$y' : ''}',
-        ).create(recursive: true);
+        await Directory('${b.path}/${k.folder}').create(recursive: true);
       } catch (e) {
         debugPrint('FileService.ensureTree ${k.folder}: $e');
       }
@@ -276,12 +284,18 @@ class FileService {
     }
   }
 
-  /// مجلد النوع (مع مجلد السنة للمستندات)
-  static Future<Directory?> dirFor(FileKind kind, {String? year}) async {
+  /// اسم مجلد العميل: اسمه بعد تنظيف الأحرف الممنوعة؛ فارغ ⇐ «بدون عميل»
+  static String clientFolder(String? clientName) {
+    final n = safeName(clientName ?? '');
+    return n.isEmpty ? 'بدون عميل' : n;
+  }
+
+  /// مجلد النوع (مع مجلد العميل للمستندات): <التطبيق>/<الخدمة>/<العميل>/
+  static Future<Directory?> dirFor(FileKind kind, {String? client}) async {
     final b = await base();
     if (b == null) return null;
     var p = '${b.path}/${kind.folder}';
-    if (kind.byYear) p += '/${year ?? DateTime.now().year.toString()}';
+    if (kind.byClient) p += '/${clientFolder(client)}';
     final d = Directory(p);
     await d.create(recursive: true);
     return d;
@@ -292,10 +306,10 @@ class FileService {
     Uint8List bytes,
     FileKind kind,
     String fileName, {
-    String? year,
+    String? client,
   }) async {
     try {
-      final d = await dirFor(kind, year: year);
+      final d = await dirFor(kind, client: client);
       if (d == null) return null;
       final f = File('${d.path}/${safeName(fileName)}');
       await f.writeAsBytes(bytes, flush: true);
@@ -392,6 +406,46 @@ class FileService {
   /// مشاركة ملف محفوظ مباشرة من مساره
   static Future<void> share(String path, {String? text, String? subject}) =>
       Share.shareXFiles([XFile(path)], text: text, subject: subject);
+
+  /// ترحيل لمرة واحدة من هيكل «النوع/السنة/» (≤ 2.5.0) إلى «النوع/العميل/».
+  /// [clientOf] يستنتج اسم العميل من اسم الملف (أسماء ملفاتنا تحوي « - <العميل>»).
+  /// الملفات التي لا يُعرف عميلها تبقى في مكانها. يعيد عدد الملفات المنقولة.
+  static Future<int> migrateYearFoldersToClients(
+    String? Function(String fileName) clientOf,
+  ) async {
+    var n = 0;
+    final b = await base();
+    if (b == null) return 0;
+    final yearRe = RegExp(r'^\d{4}$');
+    for (final k in FileKind.values) {
+      if (!k.byClient) continue;
+      final root = Directory('${b.path}/${k.folder}');
+      if (!await root.exists()) continue;
+      try {
+        await for (final e in root.list(followLinks: false)) {
+          if (e is! Directory) continue;
+          final name = e.uri.pathSegments.where((s) => s.isNotEmpty).last;
+          if (!yearRe.hasMatch(name)) continue; // ليس مجلد سنة
+          await for (final f in e.list(followLinks: false)) {
+            if (f is! File) continue;
+            final fn = f.uri.pathSegments.last;
+            final c = clientOf(fn);
+            if (c == null || c.isEmpty) continue;
+            final dst = File('${root.path}/${clientFolder(c)}/$fn');
+            if (await dst.exists()) continue;
+            await dst.parent.create(recursive: true);
+            await f.rename(dst.path);
+            n++;
+          }
+          // احذف مجلد السنة إن صار فارغًا
+          if (await e.list().isEmpty) await e.delete();
+        }
+      } catch (err) {
+        debugPrint('FileService.migrateYearFolders ${k.folder}: $err');
+      }
+    }
+    return n;
+  }
 
   /// سنة المستند من تاريخ ISO (yyyy-mm-dd)؛ السنة الحالية إن كان التاريخ غير صالح
   static String yearOf(String isoDate) {

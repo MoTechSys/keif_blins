@@ -19,17 +19,21 @@ class ShareService {
         ..writeln('${inv.clientName} الكريم،')
         ..writeln()
         ..writeln('يسعدنا في *${org.name}* تقديم عرض السعر رقم *${inv.number}*')
-        ..writeln('التاريخ: ${fmtDate(inv.issueDate)}');
+        ..writeln(
+          'التاريخ: ${fmtDateH(inv.issueDate, hijri: org.hijriEnabled)}',
+        );
       if (inv.eventDate.isNotEmpty) {
         b.writeln(
-          'المناسبة: ${fmtDate(inv.eventDate)}${inv.location.isNotEmpty ? ' — ${inv.location}' : ''}',
+          'المناسبة: ${fmtDateH(inv.eventDate, hijri: org.hijriEnabled)}${inv.location.isNotEmpty ? ' — ${inv.location}' : ''}',
         );
       }
       b.writeln(
         'إجمالي العرض: *${fmtSAR(t.total)}*${t.vatRateBp > 0 ? ' (شامل الضريبة)' : ''}',
       );
       if (inv.validUntil.isNotEmpty) {
-        b.writeln('العرض ساري حتى: ${fmtDate(inv.validUntil)}');
+        b.writeln(
+          'العرض ساري حتى: ${fmtDateH(inv.validUntil, hijri: org.hijriEnabled)}',
+        );
       }
       b
         ..writeln()
@@ -43,10 +47,12 @@ class ShareService {
         ..writeln('${inv.clientName} الكريم،')
         ..writeln()
         ..writeln('مرفق فاتورة رقم *${inv.number}* من *${org.name}*')
-        ..writeln('التاريخ: ${fmtDate(inv.issueDate)}');
+        ..writeln(
+          'التاريخ: ${fmtDateH(inv.issueDate, hijri: org.hijriEnabled)}',
+        );
       if (inv.eventDate.isNotEmpty) {
         b.writeln(
-          'المناسبة: ${fmtDate(inv.eventDate)}${inv.location.isNotEmpty ? ' — ${inv.location}' : ''}',
+          'المناسبة: ${fmtDateH(inv.eventDate, hijri: org.hijriEnabled)}${inv.location.isNotEmpty ? ' — ${inv.location}' : ''}',
         );
       }
       b.writeln('الإجمالي: *${fmtSAR(t.total)}*');
@@ -76,7 +82,9 @@ class ShareService {
       ..writeln('${s.client.name} الكريم،')
       ..writeln()
       ..writeln('مرفق كشف حساب رقم *${s.number}* من *${org.name}*')
-      ..writeln('تاريخ الإصدار: ${fmtDate(s.issueDate)}')
+      ..writeln(
+        'تاريخ الإصدار: ${fmtDateH(s.issueDate, hijri: org.hijriEnabled)}',
+      )
       ..writeln('عدد الفواتير: ${s.count}');
     if (s.opening != 0) b.writeln('رصيد سابق: ${fmtSAR(s.opening)}');
     b
@@ -103,7 +111,7 @@ class ShareService {
     'السلام عليكم ورحمة الله وبركاته',
     '${c.name} الكريم،',
     '',
-    'نفيدكم باستلام مبلغ *${fmtSAR(p.amount)}* بتاريخ ${fmtDate(p.date)} (${p.method}).',
+    'نفيدكم باستلام مبلغ *${fmtSAR(p.amount)}* بتاريخ ${fmtDateH(p.date, hijri: org.hijriEnabled)} (${p.method}).',
     'مرفق سند القبض رقم *${p.receiptNumber}*.',
     '',
     'شكرًا لكم — ${org.name}',

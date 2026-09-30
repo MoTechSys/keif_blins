@@ -109,7 +109,7 @@ class _StorageSetupScreenState extends State<StorageSetupScreen>
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'كل فاتورة أو عرض أو خطاب تُصدره يُحفظ فورًا ملف PDF في مجلد باسم التطبيق في الذاكرة الداخلية، مرتّبًا حسب النوع والسنة — تجده من «مدير الملفات» مباشرة.',
+                        'كل فاتورة أو عرض أو خطاب تُصدره يُحفظ فورًا ملف PDF في مجلد باسم التطبيق في الذاكرة الداخلية، مرتّبًا حسب النوع ثم اسم العميل — تجده من «مدير الملفات» مباشرة.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           color: C.text2,
@@ -134,7 +134,7 @@ class _StorageSetupScreenState extends State<StorageSetupScreen>
                                   k == FileKind.backup
                                       ? Icons.backup_outlined
                                       : Icons.folder_open_rounded,
-                                  '   ${k.folder}${k.byYear ? ' / ${DateTime.now().year}' : ''}',
+                                  '   ${k.folder}${k.byClient ? ' / اسم العميل' : ''}',
                                 ),
                             ],
                           ),

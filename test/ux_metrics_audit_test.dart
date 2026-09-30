@@ -273,6 +273,25 @@ void main() {
           'docSettings': () => const DocSettingsScreen(),
           'drawer': () => Scaffold(body: AppDrawer(onNavigate: (_) {})),
           'signin': () => const SignInScreen(),
+          // الهجري مفعّل: الشاشات التي تعرض تواريخ
+          'home-hijri': () {
+            s.org.hijriEnabled = true;
+            return Scaffold(
+              body: HomeScreen(onNavigate: (_) {}, onMenu: () {}),
+            );
+          },
+          'docDetail-hijri': () {
+            s.org.hijriEnabled = true;
+            return DocDetail(id: inv.id);
+          },
+          'docForm-hijri': () {
+            s.org.hijriEnabled = true;
+            return DocForm(kind: DocKind.invoice, doc: inv);
+          },
+          'docSettings-hijri': () {
+            s.org.hijriEnabled = true;
+            return const DocSettingsScreen();
+          },
         };
 
         for (final e in screens.entries) {
